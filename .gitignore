@@ -1,0 +1,5 @@
+bin/
+build/
+__pycache__/
+*.pyd
+src/wrapper_python/wrapper.cpp

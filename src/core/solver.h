@@ -137,6 +137,7 @@ public:
     int setCyclic(bool cyclic)           {return problem->setCyclic(cyclic);}
     int setSymmetric(bool symmetric)     {return problem->setSymmetric(symmetric);}
     int addArc(int i, int j)             {return problem->addArc(i, j);}
+    int setPair(int pickup, int delivery) {return problem->setPair(pickup, delivery);}
 
     //Objective management
     int  setInitCost(double cost)                                    {init_cost = cost; return RETURN_OK;}

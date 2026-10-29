@@ -40,6 +40,7 @@ cdef extern from "solver.h":
         int setCyclic(bool cyclic)
         int setSymmetric(bool symmetric)
         int addArc(int i, int j)
+        int setPair(int pickup, int delivery)
 
         # Objective
         int setInitCost(double value)

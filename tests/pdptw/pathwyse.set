@@ -1,0 +1,35 @@
+# Settings for the PDPTW tests: forward search, no two-cycle elimination, quiet.
+verbosity = 0
+
+problem/memory_threshold             = 10000
+problem/decimal_digits               = 0
+
+algo/preprocessing/intensity = full
+algo/preprocessing/critical  = 0
+
+algo_names    = PWDefault,PWDefaultRelaxDom,PWDefaultRelaxQueue
+algo_active   = 1,0,0
+algo_parallel = 0
+
+algo/default/autoconfig = 1
+algo/default/timelimit = 0
+algo/default/search = forward
+algo/default/parallel = 0
+algo/default/bidirectional/split = 0.5
+algo/default/reserve = 100000
+
+algo/default/use_visited = 1
+algo/default/compare_unreachables = 1
+algo/two_cycle_elimination = 0
+
+algo/default/ng = off
+algo/default/ng/set_size = 8
+algo/default/dssr = standard
+
+algo/default/candidate/type = node
+algo/default/join/type = ordered
+algo/requested_solutions = 1
+algo/default/relaxations/queue_limit = 10
+
+data_collection/level = -1
+output/write = 0

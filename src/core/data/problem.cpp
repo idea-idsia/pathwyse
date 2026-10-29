@@ -10,6 +10,7 @@
 Problem::Problem() {
     name = "undefined";
     n_nodes = 0;
+    n_pairs = 0;
     origin = 0;
     destination = 0;
     n_res = 0;
@@ -391,6 +392,31 @@ int Problem::setNumNodes(int n) {
     }
     n_nodes = n;
     Logger::debug("Set number of nodes: ", n);
+    return RETURN_OK;
+}
+
+int Problem::setPair(int pickup, int delivery) {
+    if(not nodeExists(pickup) or not nodeExists(delivery))
+        return RETURN_ERROR;
+    if(pickup == delivery) {
+        Logger::error("Pickup and delivery of a pair must differ");
+        return RETURN_ERROR;
+    }
+    if(pickup == origin or pickup == destination or delivery == origin or delivery == destination) {
+        Logger::error("Origin and destination cannot be part of a pair");
+        return RETURN_ERROR;
+    }
+    if((int)is_pickup.size() < n_nodes) {
+        is_pickup.resize(n_nodes, 0);
+        pickup_of.resize(n_nodes, -1);
+    }
+    if(is_pickup[pickup] or pickup_of[pickup] >= 0 or is_pickup[delivery] or pickup_of[delivery] >= 0) {
+        Logger::error("A node can belong to one pair only");
+        return RETURN_ERROR;
+    }
+    is_pickup[pickup] = 1;
+    pickup_of[delivery] = pickup;
+    n_pairs++;
     return RETURN_OK;
 }
 

@@ -28,6 +28,14 @@ public:
     bool getUnreachableActive(int i){return unreachable.get(i);}
 
 
+    //Open pickups (picked up, not yet delivered); allocated on first use
+    void ensureOpen(int n_nodes) {if(open.empty()) open = Bitset(n_nodes);}
+    bool isOpen(int node) {return not open.empty() and open.get(node);}
+    bool hasOpen() const {return open.any();}
+    void setOpen(int node) {open.set(node);}
+    void clearOpen(int node) {if(not open.empty()) open.reset(node);}
+    Bitset & getOpen(){return open;}
+
     void setUnreachable(int node){unreachable.set(node);}
     int getUnreachableCount(){return unreachable.count();}
 
@@ -55,6 +63,7 @@ protected:
     int extension_target = ALL;
     Bitset visited;
     Bitset unreachable;
+    Bitset open;
 };
 
 

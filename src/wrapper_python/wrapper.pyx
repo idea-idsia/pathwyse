@@ -107,6 +107,9 @@ cdef class PWSolver:
     def addArc(self, int i, int j):
         return self.s.addArc(i, j)
 
+    def setPair(self, int pickup, int delivery):
+        return self.s.setPair(pickup, delivery)
+
     # --- Objective ---
 
     def setInitCost(self, double value):

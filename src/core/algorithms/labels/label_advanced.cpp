@@ -7,6 +7,7 @@ LabelAdv::LabelAdv(const LabelAdv &obj) : Label(obj) {
     extension_target = obj.extension_target;
     visited = obj.visited;
     unreachable = obj.unreachable;
+    open = obj.open;
 }
 
 //Init and updates
@@ -34,17 +35,18 @@ void LabelAdv::operator= (const LabelAdv& obj)  {
     label_type = obj.label_type;
     visited = obj.visited;
     unreachable = obj.unreachable;
+    open = obj.open;
 }
 
 bool LabelAdv::operator== (LabelAdv& obj)  {
-    if(visited != obj.visited or unreachable != obj.unreachable)
+    if(visited != obj.visited or unreachable != obj.unreachable or open != obj.open)
         return false;
 
     return Label::operator==(obj);
 }
 
 bool LabelAdv::operator!= (LabelAdv& obj)  {
-    if(visited != obj.visited or unreachable != obj.unreachable)
+    if(visited != obj.visited or unreachable != obj.unreachable or open != obj.open)
         return true;
 
     return Label::operator!=(obj);

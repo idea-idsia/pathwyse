@@ -8,6 +8,10 @@
 //Queue based Label Manager for PW_default.
 //Handles data structures and returns candidates for the extension and join steps
 
+//Resource scope of a feasibility check. Monotone resources never become feasible again along a route.
+//Load with deliveries is not monotone.
+enum {SCOPE_ALL = 0, SCOPE_MONOTONE = 1, SCOPE_NONMONOTONE = 2};
+
 class LMDefault{
 
 public:
@@ -28,6 +32,7 @@ public:
     void setProblem(Problem* problem) {this->problem = problem;}
     void setUseVisited(bool use_visited) {this->use_visited = use_visited;}
     void setCompareUnreachables(bool compare_unreachables) {this->compare_unreachables = compare_unreachables;}
+    void setForwardSearch() {search_direction = SEARCH_FORWARD; bidirectional = false;}
     int getUseVisited(){return use_visited;}
     int getCompareUnreachables(){return compare_unreachables;}
 
@@ -57,7 +62,8 @@ public:
     /** Label management**/
     //Label extension
     bool isNodeReachable(LabelAdv *label, int next_node);
-    bool isExtensionFeasible(LabelAdv *label, int next_node);
+    bool isExtensionFeasible(LabelAdv *label, int next_node, int scope = SCOPE_ALL);
+    bool isPairingFeasible(LabelAdv *label, int next_node);
     bool isCriticalExtensionFeasible(LabelAdv *label, int next_node);
     void extendLabel(LabelAdv *current_label, LabelAdv *new_label, int next_node);
     void updateUnreachables(LabelAdv *label);
@@ -145,6 +151,8 @@ protected:
     double split_ratio;
     int incumbent;
     bool use_visited, compare_unreachables;
+    std::vector<char> res_monotone;                 //res_monotone[id] = 1 if resource id has no negative node consumption
+    void computeMonotoneResources();
     bool two_cycle_elimination;
 
     int ndominated_fw, ndominated_bw;

@@ -37,6 +37,8 @@ void LMDefault::initLM(){
     int n_nodes = problem->getNumNodes();
     int n_res = problem->getNumRes();
 
+    computeMonotoneResources();
+
     //Reserve space for labels
     forward_labels.reserve(reserve_size);
     backward_labels.reserve(reserve_size);
@@ -63,6 +65,8 @@ void LMDefault::initLM(){
         forward_labels[0].initLabel(origin, predecessor, direction, n_res);
         if(use_visited)
             forward_labels[0].initVisited(origin, n_nodes);
+        if(problem->hasPairs())
+            forward_labels[0].ensureOpen(n_nodes);
         forward_labels[0].setObjective(objective->getInitValue() + objective->getNodeCost(origin));
         ++ins_attempts_fw;
 
@@ -329,17 +333,44 @@ bool LMDefault::isNodeReachable(LabelAdv *label, int next_node){
         return isExtensionFeasible(label, next_node);
 }
 
-bool LMDefault::isExtensionFeasible(LabelAdv *label, int next_node) {
+void LMDefault::computeMonotoneResources() {
+    std::vector<Resource*>& resources = problem->getResources();
+    res_monotone.assign(resources.size(), 1);
+    for(int id = 0; id < resources.size(); id++)
+        for(int node = 0; node < problem->getNumNodes(); node++)
+            if(resources[id]->getNodeCost(node) < 0) {
+                res_monotone[id] = 0;
+                break;
+            }
+}
+
+//Pairing and precedence: a delivery needs its pickup open, a pickup cannot be opened twice,
+//the destination needs no open pickup. Forward search only.
+bool LMDefault::isPairingFeasible(LabelAdv *label, int next_node) {
+    if(next_node == problem->getDestination())
+        return not label->hasOpen();
+    if(problem->isPickup(next_node))
+        return not label->isOpen(next_node);
+    int pickup = problem->getPickupOf(next_node);
+    return pickup < 0 or label->isOpen(pickup);
+}
+
+bool LMDefault::isExtensionFeasible(LabelAdv *label, int next_node, int scope) {
     int current_value;
     bool direction = label->getDirection();
     double bounding = 1;
 
     std::vector<Resource*>& resources = problem->getResources();
 
+    if(scope != SCOPE_ALL and res_monotone.size() != resources.size())
+        computeMonotoneResources();
+
     int i = direction ? label->getNode() : next_node;
     int j = direction ? next_node : label->getNode();
 
     for(int id = 0; id < resources.size(); id++) {
+        if(scope != SCOPE_ALL and (scope == SCOPE_MONOTONE) != (bool)res_monotone[id])
+            continue;
         current_value = label->getSnapshot(id);
         current_value = resources[id]->extend(current_value, i, j, direction);
         if(!resources[id]->isFeasible(current_value, next_node, bounding, direction))
@@ -393,6 +424,14 @@ void LMDefault::extendLabel(LabelAdv *current_label, LabelAdv *new_label, int ne
         new_label->setSnapshot(id, new_value);
     }
 
+    //Open pickups
+    if(problem->hasPairs()) {
+        new_label->ensureOpen(problem->getNumNodes());
+        if(problem->isPickup(next_node))
+            new_label->setOpen(next_node);
+        else if(problem->getPickupOf(next_node) >= 0)
+            new_label->clearOpen(problem->getPickupOf(next_node));
+    }
 }
 
 void LMDefault::updateUnreachables(LabelAdv *candidate) {
@@ -403,7 +442,7 @@ void LMDefault::updateUnreachables(LabelAdv *candidate) {
         bool direction = candidate->getDirection();
         std::vector<int> & neighbors = problem->getNeighbors(node, direction);
         for(auto & neigh: neighbors)
-            if(candidate->isReachable(neigh) and not isExtensionFeasible(candidate, neigh))
+            if(candidate->isReachable(neigh) and not isExtensionFeasible(candidate, neigh, SCOPE_MONOTONE))
                 candidate->setUnreachable(neigh);
 
         if (not isExtensionFeasible(candidate, predecessor))
@@ -555,6 +594,10 @@ bool LMDefault::dominates(LabelAdv* l1, LabelAdv* l2)  {
     for(int id = 0; id < l1->getSnapshot().size(); id++)
         if(l1->getSnapshot(id) > l2->getSnapshot(id))
             return false;
+
+    //Open pickups: l1 must not carry more open requests than l2
+    if(problem->hasPairs() and not is_subset(l1->getOpen(), l2->getOpen()))
+        return false;
 
     if(not compare_unreachables)
         return true;
