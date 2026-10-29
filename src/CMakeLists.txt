@@ -4,8 +4,11 @@ cmake_minimum_required(VERSION 3.20)
 #Compilation flags
 set(CMAKE_CXX_STANDARD 20)
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+if (MSVC)
 	set(CMAKE_CXX_FLAGS  "/O2 /w  /DNDEBUG")
+elseif (WIN32)
+	# MinGW-w64 GCC on Windows
+	set(CMAKE_CXX_FLAGS  "-O3 -w -DNDEBUG")
 else()
 	set(CMAKE_CXX_FLAGS  "-O3 -w -pthread -fopenmp -DNDEBUG")
 endif()
@@ -82,7 +85,10 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
         PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY_RELEASE ../../bin
         RUNTIME_OUTPUT_DIRECTORY_RELEASE ../../bin
-        ARCHIVE_OUTPUT_DIRECTORY_RELEASE ../../bin)
+        ARCHIVE_OUTPUT_DIRECTORY_RELEASE ../../bin
+        LIBRARY_OUTPUT_DIRECTORY ../../bin
+        RUNTIME_OUTPUT_DIRECTORY ../../bin
+        ARCHIVE_OUTPUT_DIRECTORY ../../bin)
 else()
     set_target_properties(pathwyse_core PROPERTIES LIBRARY_OUTPUT_DIRECTORY ../../bin)
 endif()
@@ -95,7 +101,7 @@ set(SOURCE_FILES_STANDALONE
 
 add_executable(pathwyse ${SOURCE_FILES_STANDALONE})
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-    set_target_properties(pathwyse PROPERTIES RUNTIME_OUTPUT_DIRECTORY_RELEASE ../../bin)
+    set_target_properties(pathwyse PROPERTIES RUNTIME_OUTPUT_DIRECTORY_RELEASE ../../bin RUNTIME_OUTPUT_DIRECTORY ../../bin)
 else()
     set_target_properties(pathwyse PROPERTIES RUNTIME_OUTPUT_DIRECTORY ../../bin)
 endif()

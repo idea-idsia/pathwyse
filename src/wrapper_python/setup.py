@@ -3,7 +3,9 @@ from Cython.Build import cythonize
 import sys, os
 
 # Extension module
-if sys.platform.startswith("win"):
+# MSVC is assumed on Windows unless the build is run with --compiler=mingw32
+msvc = sys.platform.startswith("win") and not any("mingw" in a for a in sys.argv)
+if msvc:
     ext_modules = [
         Extension(
             "wrapper",                                      # Module name
@@ -16,6 +18,18 @@ if sys.platform.startswith("win"):
         )
     ]
     os.add_dll_directory(os.getcwd()+"\\bin")
+elif sys.platform.startswith("win"):
+    ext_modules = [
+        Extension(
+            "wrapper",
+            sources=["src/wrapper_python/wrapper.pyx"],
+            libraries=["pathwyse_core"],
+            library_dirs=['bin/'],
+            include_dirs=['src/core/'],
+            language="c++",
+            extra_compile_args=["-O3", "-std=c++20"],
+        )
+    ]
 else:
     ext_modules = [
         Extension(
