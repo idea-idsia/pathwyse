@@ -45,6 +45,7 @@ void PWDefault::initAlgorithm() {
 void PWDefault::readConfiguration(){
     requested_solutions = Parameters::getRequestedSolutions();
     timelimit = Parameters::getDefaultTimelimit();
+    if(timelimit_override > EPS) timelimit = timelimit_override;
     parallel = Parameters::isDefaultParallel();
     search_direction = Parameters::getDefaultSearch();
     bidirectional = search_direction == SEARCH_BIDIRECTIONAL;
@@ -163,6 +164,8 @@ void PWDefault::solve(){
     setStatus(ALGO_OPTIMIZING);
 
     bool termination = false;
+    total_labels = 0;
+    rounds = 0;
 
 
     if(not problem->isGraphCyclic() and Parameters::getPreprocessingIntensity() != PREPROCESSING_OFF){
@@ -205,6 +208,9 @@ void PWDefault::solve(){
             label_manager->join();
             collector.stopTime("t_join");
         }
+
+        total_labels += label_manager->totalLabels();
+        rounds++;
 
         //Manage paths
         managePaths();

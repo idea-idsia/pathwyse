@@ -47,6 +47,13 @@ public:
 
     double getGlobalTime(){return collector.getGlobalTime();}
 
+    //Per-solve time limit in seconds (overrides the settings file, kept over resets); 0 = use the settings file
+    void setTimelimit(double seconds) {timelimit_override = seconds > 0 ? (float)seconds : 0.0f; if(timelimit_override > 0) timelimit = timelimit_override;}
+
+    //Statistics of the last solve (labeling algorithms)
+    virtual unsigned long long getLabelCount() {return 0;}
+    virtual int getRounds() {return 0;}
+
 
     //Solution
     Path* getBestSolution() {return best_solution_id >= 0 ? &solutions[best_solution_id] : nullptr;}
@@ -89,6 +96,7 @@ protected:
     int incumbent;
     int lower_bound;
     float timelimit;
+    float timelimit_override = 0.0f;
     bool timeout;
 
     //Solution

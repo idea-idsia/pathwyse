@@ -29,6 +29,10 @@ public:
     void extend(LabelAdv* candidate);
     bool checkTermination();
 
+    //Statistics of the last solve: labels created over all DSSR rounds, number of rounds
+    unsigned long long getLabelCount() override {return total_labels;}
+    int getRounds() override {return rounds;}
+
     //Path building
     void managePaths();
     void manageAdditionalPaths();
@@ -77,6 +81,8 @@ protected:
     int unreachable_max_count, previous_unreachable_max_count;
     bool ng_compliant;
     int it_ext_fw, it_ext_bw;
+    unsigned long long total_labels = 0;
+    int rounds = 0;
 };
 
 #endif

@@ -70,6 +70,21 @@ cdef class PWSolver:
     def solve(self):
         self.s.solve()
 
+    def setAlgorithmTimelimit(self, int id, double seconds):
+        self.s.setAlgorithmTimelimit(id, seconds)
+
+    def getAlgorithmStatus(self, int id):
+        return self.s.getAlgorithmStatus(id)
+
+    def getAlgorithmTime(self, int id):
+        return self.s.getAlgorithmTime(id)
+
+    def getAlgorithmLabels(self, int id):
+        return self.s.getAlgorithmLabels(id)
+
+    def getAlgorithmRounds(self, int id):
+        return self.s.getAlgorithmRounds(id)
+
     # --- Problem creation ---
 
     def createProblem(self):

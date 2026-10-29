@@ -82,6 +82,13 @@ public:
     //Solve Problem with selected Algorithms
     void solve();
 
+    //Per-algorithm settings and statistics of the last solve
+    void setAlgorithmTimelimit(int id, double seconds) {if(id >= 0 and id < (int)algorithms.size()) algorithms[id]->setTimelimit(seconds);}
+    int getAlgorithmStatus(int id)                {return (id >= 0 and id < (int)algorithms.size()) ? algorithms[id]->getStatus() : -1;}
+    double getAlgorithmTime(int id)               {return (id >= 0 and id < (int)algorithms.size()) ? algorithms[id]->getGlobalTime() : 0.0;}
+    unsigned long long getAlgorithmLabels(int id) {return (id >= 0 and id < (int)algorithms.size()) ? algorithms[id]->getLabelCount() : 0;}
+    int getAlgorithmRounds(int id)                {return (id >= 0 and id < (int)algorithms.size()) ? algorithms[id]->getRounds() : 0;}
+
     //Reset algorithms
     void resetAlgorithm(int id, int reset_level);
     void resetAllAlgorithms(int reset_level);
