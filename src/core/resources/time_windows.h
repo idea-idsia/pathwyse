@@ -14,6 +14,7 @@ public:
     int join(int current_value_forward, int current_value_backward, int i, int j) override;
     int join(int current_value_forward, int current_value_backward, int node) override;
     bool isFeasible(int current_value, int current_node, double bounding, bool direction) override;
+    int getMinConsumption(int i, int j, bool direction) override;
 };
 
 #endif

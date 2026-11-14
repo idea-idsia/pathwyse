@@ -1,6 +1,6 @@
 # Parameters
 
-We provide a configuration file for PathWyse in the root directory: **pathwyse.set**.
+We provide a configuration file for PathWyse in the root directory: **pathwyse.set**. See [Suggested Settings](SUGGESTED_SETTINGS.md) for the recommended configuration on cyclic and acyclic networks.
 
 If the file is present in the folder where PathWyse is run, it will override the library default configuration. Note that this is the current working directory of the process, not the folder containing the executable: running a binary built under a `build/` folder from within that folder will fall back to the defaults unless `pathwyse.set` is also placed there (or the binary is run from the folder that contains it), showing a warning.
 
@@ -27,7 +27,7 @@ Values can be either numbers or text. Single-line comments are supported and mus
 | Parameter | Description | Values | Default |
 |---|---|---|---|
 | `problem/memory_threshold` | Enables memory compression and sparse data structures above this node count | positive integer | `10000` |
-| `problem/decimal_digits` | Decimal places to preserve when scaling floating-point costs to integers | non-negative integer | `2` |
+| `problem/decimal_digits` | Decimal places to preserve when scaling floating-point costs to integers (PathWyse supports max 12 digits, including the integer part) | non-negative integer | `2` |
 | `problem/coordinates/distance/scaling` | Multiplier applied to computed distances | double | `0.95` |
 | `problem/coordinates/microdegrees` | Scales coordinates from microdegrees to degrees | `0` no · `1` yes | `0` |
 
@@ -89,9 +89,10 @@ Algorithm IDs are assigned in order: `PWDefault` gets id `0`, `PWDefaultRelaxDom
 | `algo/default/reserve` | Maximum labels stored per direction; memory is reserved upfront | positive integer | `10000000` |
 | `algo/default/use_visited` | Labels track visited nodes (overridden by autoconfig) | `0` off · `1` on | `1` |
 | `algo/default/compare_unreachables` | Include unreachable nodes in dominance checks (requires `use_visited = 1`, overridden by autoconfig) | `0` no · `1` yes | `1` |
-| `algo/two_cycle_elimination` | Enables two-cycle elimination | `0` off · `1` on | `0` |
+| `algo/two_cycle_elimination` | Enables two-cycle elimination (requires `compare_unreachables = 1`, otherwise disabled) | `0` off · `1` on | `0` |
 | `algo/default/ng` | NG-path relaxation type (does not guarantee an elementary solution) | `off` · `restricted` · `standard` | `off` |
 | `algo/default/ng/set_size` | NG neighbourhood size per node (requires NG enabled) | positive integer | `8` |
+| `algo/default/ng/set_path` | Path to a CSV file defining the NG neighbourhoods: an n × n matrix of `0`/`1`, one row per node, where each node must include itself. Overrides `set_size` (requires NG enabled) | file path | empty |
 | `algo/default/dssr` | DSSR type (guarantees optimality if completed before timelimit; applied after NG if both are enabled) | `off` · `restricted` · `standard` | `standard` |
 | `algo/default/candidate/type` | Label candidate selection strategy (overridden by autoconfig) | `node` · `roundrobin` | `node` |
 | `algo/default/join/type` | Join strategy after bidirectional search (requires `bidirectional` search) | see below | `ordered` |
@@ -124,12 +125,14 @@ In both cases, some candidate solutions may be discarded before being returned: 
 | `kordered_node` | k-ordered join performed on nodes |
 | `pareto` | Binary-search based join on arcs |
 | `pareto_node` | Binary-search based join on nodes |
+| `bucket_node` | Join on nodes exploiting the bucket structure (PWBucket only) |
+| `kbucket_node` | Bucket join extended to collect multiple solutions (PWBucket only); automatically selected when `requested_solutions > 1` and a node join is set |
 
 ---
 
 ## PWBucket
 
-PWBucket also reads the following parameters from the PWDefault section: `algo/default/timelimit`, `algo/default/search`, `algo/default/parallel`, `algo/default/ng`, `algo/default/ng/set_size`, `algo/default/dssr`, `algo/two_cycle_elimination`, `algo/requested_solutions`.
+PWBucket also reads the following parameters from the PWDefault section: `algo/default/timelimit`, `algo/default/search`, `algo/default/parallel`, `algo/default/ng`, `algo/default/ng/set_size`, `algo/default/ng/set_path`, `algo/default/dssr`, `algo/default/join/type`, `algo/two_cycle_elimination`, `algo/requested_solutions`.
 
 | Parameter | Description | Values | Default |
 |---|---|---|---|

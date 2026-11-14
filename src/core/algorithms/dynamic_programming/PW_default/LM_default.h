@@ -28,6 +28,8 @@ public:
     void setProblem(Problem* problem) {this->problem = problem;}
     void setUseVisited(bool use_visited) {this->use_visited = use_visited;}
     void setCompareUnreachables(bool compare_unreachables) {this->compare_unreachables = compare_unreachables;}
+    void setUnreachables(std::vector<Bitset>* unreachable_active) {this->unreachable_active = unreachable_active;}
+    void setUnreachablesNG(std::vector<Bitset>* unreachable_ng) {this->unreachable_ng = unreachable_ng;}
     int getUseVisited(){return use_visited;}
     int getCompareUnreachables(){return compare_unreachables;}
 
@@ -37,8 +39,8 @@ public:
     double getSplit() {return split_ratio;}
 
     //Incumbent
-    int getIncumbent(){return incumbent;}
-    void setIncumbent(int incumbent){this->incumbent = incumbent;}
+    cost_t getIncumbent(){return incumbent;}
+    void setIncumbent(cost_t incumbent){this->incumbent = incumbent;}
 
     //Queries
     int getForwardSize() {return forward_labels.size();}
@@ -61,10 +63,12 @@ public:
     bool isCriticalExtensionFeasible(LabelAdv *label, int next_node);
     void extendLabel(LabelAdv *current_label, LabelAdv *new_label, int next_node);
     void updateUnreachables(LabelAdv *label);
+    void updateMaskedNeighbors();
 
     //Label insertion
     LabelAdv* insert(LabelAdv *new_label);
-    bool dominates(LabelAdv *l1, LabelAdv *l2);
+    FORCE_INLINE bool dominates(LabelAdv *l1, LabelAdv *l2);
+    NO_INLINE bool dominatesTwoCycle(LabelAdv *l1, LabelAdv *l2);
 
     /** Join **/
     void join();
@@ -81,21 +85,22 @@ public:
     bool isJoinFeasible(LabelAdv* forward, LabelAdv* backward);                 //Checks if two labels can be joined
     bool isNodeJoinFeasible(LabelAdv* forward, LabelAdv* backward);             //Checks if two labels can be joined
 
-    void paretoSearchBlock(Resource* objective, int node_fw, int node_bw,
-                           std::vector<std::pair<int, int>>& rows,
-                           std::vector<std::pair<int, int>>& cols,
+    void paretoSearchBlock(CostResource* objective, int node_fw, int node_bw,
+                           std::vector<std::pair<cost_t, int>>& rows,
+                           std::vector<std::pair<cost_t, int>>& cols,
                            int start_row, int end_row, int start_col, int end_col);
     bool joinFound() {return not joinable_labels.empty();}                      //Checks if a join was found
 
-    std::tuple<int, LabelAdv*, LabelAdv*> getBestJoin() {return *joinable_labels.begin();}       //returns best join
-    std::multiset<std::tuple<int, LabelAdv*, LabelAdv*>> getAllJoin() {return joinable_labels;}
+    std::tuple<cost_t, LabelAdv*, LabelAdv*> getBestJoin() {return *joinable_labels.begin();}       //returns best join
+    std::multiset<std::tuple<cost_t, LabelAdv*, LabelAdv*>> getAllJoin() {return joinable_labels;}
 
     /** Solution management **/
-    std::tuple<int, LabelAdv*, LabelAdv*> getSolutionLabels();
+    std::tuple<cost_t, LabelAdv*, LabelAdv*> getSolutionLabels();
+    int getJoinRank(LabelAdv* label_forward, LabelAdv* label_backward);
     void setODLabel();
     LabelAdv* getODLabel(){return (od_label.second >= 0) ? getLabel(od_label.first, od_label.second) : nullptr;}
     void sortClosedLabels(bool direction, int node);
-    const std::vector<std::pair<int, int>>& getClosedLabels(bool direction, int node);
+    const std::vector<std::pair<cost_t, int>>& getClosedLabels(bool direction, int node);
 
     /** Heuristic management **/
     void setQueueLimit(int queue_limit){if(queue_limit > 0) this->queue_limit = queue_limit;}
@@ -143,8 +148,11 @@ protected:
     int requested_solutions;
     int turn_forward, turn_backward;
     double split_ratio;
-    int incumbent;
+    cost_t incumbent;
     bool use_visited, compare_unreachables;
+    std::vector<Bitset>* unreachable_active = nullptr;
+    std::vector<Bitset>* unreachable_ng = nullptr;
+    std::vector<std::vector<int>> masked_neighbors_fw, masked_neighbors_bw;
     bool two_cycle_elimination;
 
     int ndominated_fw, ndominated_bw;
@@ -156,17 +164,17 @@ protected:
     /** Label pools, masks, and pointers **/
     std::vector<LabelAdv> forward_labels, backward_labels;  //Pool of all available forward (resp. backward) labels
 
-    //For each node, store an ordered list of labels (pointer)
+    //For each node, store an ordered list of (objective, index) pairs
     //Open labels
-    std::vector<std::list<std::pair<int, int>>> forward_candidates, backward_candidates;            //Open labels
+    std::vector<std::list<std::pair<cost_t, int>>> forward_candidates, backward_candidates;         //Open labels
     LabelAdv *best_fw, *best_bw;                                                                    //Best overall labels
     std::vector<LabelAdv*> forward_best, backward_best;                                             //Best overall LabelAdv for each node
 
     //Closed labels
-    std::vector<std::vector<std::pair<int, int>>> forward_closed, backward_closed;                      //Closed labels
-    std::vector<std::vector<std::pair<int, int>>> forward_closed_backup, backward_closed_backup;        //Backup of closed labels
+    std::vector<std::vector<std::pair<cost_t, int>>> forward_closed, backward_closed;                   //Closed labels
+    std::vector<std::vector<std::pair<cost_t, int>>> forward_closed_backup, backward_closed_backup;     //Backup of closed labels
 
-    std::multiset<std::tuple<int, LabelAdv*, LabelAdv*>> joinable_labels;                 //Joinable label pairs
+    std::multiset<std::tuple<cost_t, LabelAdv*, LabelAdv*>> joinable_labels;              //Joinable label pairs
 
     //Data collection
     int executionID;

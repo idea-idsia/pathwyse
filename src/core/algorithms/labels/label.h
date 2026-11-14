@@ -13,15 +13,15 @@ public:
     Label() {}
     Label(const Label &obj);
 
-    virtual ~Label() = default;
+    ~Label() = default;
 
     //Init and updates
     void initLabel(int node, Label* predecessor, bool direction, int n_res);
     void updateLabel(int node, Label* predecessor);
 
     //Resources management
-    int getObjective(){return objective;}
-    void setObjective(int objective){this->objective = objective;}
+    cost_t getObjective(){return objective;}
+    void setObjective(cost_t objective){this->objective = objective;}
 
     int getSnapshot(int resID) {return snapshot[resID];}
     std::vector<int> & getSnapshot() {return snapshot;}
@@ -34,7 +34,7 @@ public:
     Label* getPredecessor(){return predecessor;}
     int getPredecessorNode(){return predecessor ? predecessor->getNode() : -1;}
 
-    bool isObjectiveSet(){return objective != UNKNOWN;}
+    bool isObjectiveSet(){return objective != MAX_COST;}
 
     /** Operators **/
     void operator= (const Label& obj);
@@ -54,7 +54,7 @@ protected:
     Label* predecessor = nullptr;
 
     //Resources
-    int objective = UNKNOWN;
+    cost_t objective = MAX_COST;
     std::vector<int> snapshot;
 };
 

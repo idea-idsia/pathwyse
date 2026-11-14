@@ -90,6 +90,12 @@ void LMBucket::initLM(){
             else if (next_percentage < 1.0)
                 max_bucket_to_check[i] = std::min(bucket_count,i+shift_next); // excluded from check
         }
+
+        if (join_algo == JOIN_BUCKET_NODE or join_algo == JOIN_KBUCKET_NODE){
+            min_consumption_at_bucket.resize(bucket_count);
+            for (int i = 0; i != bucket_count; ++i)
+                min_consumption_at_bucket[i] = i*bucket_size;
+        }
     }
 
     //Push back first forward and backward labels
@@ -138,7 +144,7 @@ void LMBucket::initLM(){
     fw_cur_bucket_idx = bw_cur_bucket_idx = 0;
     fw_cur_node = bw_cur_node = 0;
 
-    incumbent = UNKNOWN;
+    incumbent = MAX_COST;
     od_label = nullptr;
     joinComparisons = 0;
 
@@ -150,15 +156,24 @@ void LMBucket::readConfiguration() {
     autoconfiguration = Parameters::isDefaultAutoConfigured();
     split_ratio = Parameters::getDefaultSplit();
     compare_unreachables = true;
-    two_cycle_elimination = Parameters::useTwoCycleElimination();
+    two_cycle_elimination = Parameters::useTwoCycleElimination() and compare_unreachables;
     candidate_type = Parameters::getDefaultCandidateType();
     join_algo = Parameters::getDefaultJoinType();
-    join_type = (join_algo == JOIN_ORDERED_NODE or join_algo == JOIN_KORDERED_NODE  or join_algo == JOIN_NAIVE_NODE) ? JOIN_NODE : JOIN_ARC;
+    join_type = (
+        join_algo == JOIN_ORDERED_NODE or 
+        join_algo == JOIN_KORDERED_NODE or 
+        join_algo == JOIN_NAIVE_NODE or 
+        join_algo == JOIN_BUCKET_NODE or 
+        join_algo == JOIN_KBUCKET_NODE
+    ) ? JOIN_NODE : JOIN_ARC;
     requested_solutions = Parameters::getRequestedSolutions();
 
     if(autoconfiguration) {
-        if (bidirectional and requested_solutions > 1 and (join_algo != JOIN_KORDERED or join_algo != JOIN_KORDERED_NODE)){
-            join_algo = join_type == JOIN_NODE ? JOIN_KORDERED_NODE : JOIN_KORDERED;
+        if (bidirectional and requested_solutions > 1){
+            if (join_type == JOIN_NODE and join_algo != JOIN_KORDERED_NODE and join_algo != JOIN_KBUCKET_NODE)
+                join_algo = JOIN_KBUCKET_NODE;
+            else if (join_type == JOIN_ARC)
+                join_algo = JOIN_KORDERED;
         }
     }
 
@@ -197,7 +212,7 @@ void LMBucket::resetLM(){
     bw_queue.clear();
 
     joinable_labels.clear();
-    incumbent = UNKNOWN;
+    incumbent = MAX_COST;
     collector_label_fw.clearSubsetRecords();
     collector_label_bw.clearSubsetRecords();
     ins_attempts_fw = ins_attempts_bw = 0;
@@ -387,12 +402,13 @@ void LMBucket::extendLabel(LabelAdv *current_label, LabelAdv *new_label, int nex
     int j = direction ? next_node : current_label->getNode();
 
     //Update Objective
-    int current_value, new_value;
-    current_value = current_label->getObjective();
-    new_value = objective->extend(current_value, i, j, direction);
-    new_label->setObjective(new_value);
+    cost_t current_obj, new_obj;
+    current_obj = current_label->getObjective();
+    new_obj = objective->extend(current_obj, i, j, direction);
+    new_label->setObjective(new_obj);
 
     //Update resources
+    int current_value, new_value;
     for(int id = 0; id < problem->getNumRes(); id++) {
         current_value = current_label->getSnapshot(id);
         new_value = resources[id]->extend(current_value, i, j, direction);
@@ -406,15 +422,37 @@ void LMBucket::updateUnreachables(LabelAdv *candidate) {
     short label_type = PARTIALLY_DOMINANT;
     int node = candidate->getNode();
     bool direction = candidate->getDirection();
-    std::vector<int> & neighbors = problem->getNeighbors(node, direction);
+    std::vector<int> & neighbors = direction ? masked_neighbors_fw[node] : masked_neighbors_bw[node];
     for(auto & neigh: neighbors)
         if(candidate->isReachable(neigh) and not isExtensionFeasible(candidate, neigh))
             candidate->setUnreachable(neigh);
 
-    if (not isExtensionFeasible(candidate, predecessor))
+    if (two_cycle_elimination and
+        (predecessor == (direction ? problem->getOrigin() : problem->getDestination())
+         or not problem->isActiveNode(predecessor)
+         or not problem->areNeighbors(node, predecessor, direction)
+         or ((*unreachable_active)[node].get(predecessor) and not candidate->isReachable(predecessor))
+         or not isExtensionFeasible(candidate, predecessor)))
         label_type = DOMINANT;
 
     candidate->setLabelType(label_type);
+}
+
+void LMBucket::updateMaskedNeighbors() {
+    masked_neighbors_fw.assign(problem->getNumNodes(), {});
+    masked_neighbors_bw.assign(problem->getNumNodes(), {});
+    if(not unreachable_active or unreachable_active->empty())
+        return;
+
+    for(int node = 0; node < problem->getNumNodes(); node++) {
+        Bitset & mask = (*unreachable_active)[node];
+        for(int neigh: problem->getNeighbors(node, true))
+            if(mask.get(neigh))
+                masked_neighbors_fw[node].push_back(neigh);
+        for(int neigh: problem->getNeighbors(node, false))
+            if(mask.get(neigh))
+                masked_neighbors_bw[node].push_back(neigh);
+    }
 }
 
 //Insertion
@@ -433,7 +471,7 @@ LabelAdv* LMBucket::insert(LabelAdv* new_label) {
     const int node = new_label->getNode();
     const bool direction = new_label->getDirection();
 
-    const int objective = new_label->getObjective();
+    const cost_t objective = new_label->getObjective();
 
     const int bucket_idx = new_label->getSnapshot(bucket_resource_id) / bucket_size;
 
@@ -447,8 +485,20 @@ LabelAdv* LMBucket::insert(LabelAdv* new_label) {
 
     // Dominance in the bucket of equal consumption
     // (full checks)
-
-    for (auto it = bucket[bucket_idx][node].begin(); it != bucket[bucket_idx][node].end();)
+    
+    auto it = bucket[bucket_idx][node].begin();
+    while (it != bucket[bucket_idx][node].end() and it->getObjective() < objective)
+    {
+        old_label = &(*it);
+        if (dominates(old_label, new_label))
+            return nullptr;
+        ++it;
+    }
+    std::list<LabelAdv>::iterator insert_position;
+    bool any_label_with_lower_obj = (it != bucket[bucket_idx][node].begin());
+    if (any_label_with_lower_obj)
+        insert_position = std::prev(it);
+    while (it != bucket[bucket_idx][node].end() and it->getObjective() == objective)
     {
         old_label = &(*it);
         if (dominates(old_label, new_label))
@@ -461,9 +511,24 @@ LabelAdv* LMBucket::insert(LabelAdv* new_label) {
             it = bucket[bucket_idx][node].erase(it);
         }
         else
-            ++it; // only increment if not erased
+            ++it;
     }
-
+    while (it != bucket[bucket_idx][node].end())
+    {
+        old_label = &(*it);
+        if (dominates(new_label, old_label))
+        {
+            ndominated++;
+            if ((direction and node == destination) or (not direction and node == origin))
+                nclosed--;
+            it = bucket[bucket_idx][node].erase(it);
+        }
+        else
+            ++it;
+    }
+    if (any_label_with_lower_obj)   insert_position = std::next(insert_position);
+    else                            insert_position = bucket[bucket_idx][node].begin();
+    
     // Dominance in the buckets of lower consumption
     // (check if new label is dominated)
 
@@ -472,16 +537,17 @@ LabelAdv* LMBucket::insert(LabelAdv* new_label) {
         for (auto it = bucket[r][node].begin(); it != bucket[r][node].end(); ++it)
         {
             old_label = &(*it);
+            if (old_label->getObjective() > objective) break;
             if (dominates(old_label, new_label))
                 return nullptr;
         }
     }
 
     // Insert label
-    bucket[bucket_idx][node].emplace_back(*new_label);
+    auto new_label_it = bucket[bucket_idx][node].insert(insert_position, *new_label);
     ++ninserted;
 
-    LabelAdv* new_label_ins = &bucket[bucket_idx][node].back();
+    LabelAdv* new_label_ins = &(*new_label_it);
 
     if(Parameters::getCollectionLevel() >= 4 and Parameters::isOutputStored()) {
         collectLabel(collector_label, new_label_ins);
@@ -550,6 +616,10 @@ bool LMBucket::dominates(LabelAdv* l1, LabelAdv* l2)  {
     if (not two_cycle_elimination)
         return true;
 
+    return dominatesTwoCycle(l1, l2);
+}
+
+bool LMBucket::dominatesTwoCycle(LabelAdv* l1, LabelAdv* l2)  {
     //if L1 is dominant, L2 can be discarded
     if (l1->getLabelType() == DOMINANT)
         return true;
@@ -570,6 +640,10 @@ bool LMBucket::dominates(LabelAdv* l1, LabelAdv* l2)  {
     //Otherwise, L2 cannot be discarded
     if(l2->getLabelType() == DOMINATED)
         return l2->getExtensionTarget() != l1_predecessor;
+
+    //if there is no arc from L2 node to L1 predecessor, then L2 can be discarded
+    if (not problem->areNeighbors(l2->getNode(), l1_predecessor, l2->getDirection()))
+        return true;
 
     //if L2 does not have resources to reach L1 predecessor, then L2 can be discarded
     if (not isExtensionFeasible(l2, l1_predecessor))
@@ -605,6 +679,12 @@ void LMBucket::join(){
         case JOIN_KORDERED_NODE:
             ksol_orderedNodeJoin();
             break;
+        case JOIN_BUCKET_NODE:
+            bucketNodeJoin();
+            break;
+        case JOIN_KBUCKET_NODE:
+            ksol_bucketNodeJoin();
+            break;
         default:
             if (join_type == JOIN_NODE) orderedNodeJoin();
             else orderedJoin();
@@ -614,7 +694,7 @@ void LMBucket::join(){
 
 void LMBucket::naiveJoin(){
     auto objective = problem->getObj();
-    int cost;
+    cost_t cost;
     joinComparisons = 0;
 
     populateQueues();
@@ -639,7 +719,7 @@ void LMBucket::naiveJoin(){
 
 void LMBucket::naiveNodeJoin(){
     auto objective = problem->getObj();
-    int cost;
+    cost_t cost;
     joinComparisons = 0;
 
     populateQueues();
@@ -659,12 +739,12 @@ void LMBucket::naiveNodeJoin(){
 
 void LMBucket::orderedJoin(){
     auto objective = problem->getObj();
-    std::multiset<std::tuple<int, int, int>> orderedPairs;
-    int cost;
+    std::multiset<std::tuple<cost_t, int, int>> orderedPairs;
+    cost_t cost;
     int i, j;
 
     populateQueues();
-    
+
     // Sort queues by objective
     for(int p = 0; p < fw_queue.size(); p++){
         if(not fw_queue[p].empty())
@@ -710,6 +790,7 @@ void LMBucket::orderedJoin(){
                                 break;
                             }
                         }
+                        else break;
                     }
                 }
                 else break;
@@ -721,9 +802,9 @@ void LMBucket::orderedJoin(){
 
 void LMBucket::ksol_orderedJoin(){
     auto objective = problem->getObj();
-    std::multiset<std::tuple<int, int, int>> orderedPairs;
-    int kth_cost = UNKNOWN;
-    int cost;
+    std::multiset<std::tuple<cost_t, int, int>> orderedPairs;
+    cost_t kth_cost = MAX_COST;
+    cost_t cost;
     int i, j;
 
     populateQueues();
@@ -788,7 +869,7 @@ void LMBucket::ksol_orderedJoin(){
 
 void LMBucket::ksol_orderedNodeJoin(){
     auto objective = problem->getObj();
-    int kth_cost = UNKNOWN;
+    cost_t kth_cost = MAX_COST;
     joinComparisons = 0;
 
     populateQueues();
@@ -800,7 +881,7 @@ void LMBucket::ksol_orderedNodeJoin(){
         if(fw.empty() or bw.empty())
             continue;
 
-        int best_cost = objective->join(forward_best[node]->getObjective(), backward_best[node]->getObjective(), node);
+        cost_t best_cost = objective->join(forward_best[node]->getObjective(), backward_best[node]->getObjective(), node);
         if(best_cost > kth_cost)
             continue;
 
@@ -814,7 +895,7 @@ void LMBucket::ksol_orderedNodeJoin(){
                 break;
 
             for (auto &label_backward : bw) {
-                int cost = objective->join(label_forward->getObjective(), label_backward->getObjective(), node);
+                cost_t cost = objective->join(label_forward->getObjective(), label_backward->getObjective(), node);
                 if(cost > kth_cost)
                     break;
 
@@ -845,7 +926,7 @@ void LMBucket::orderedNodeJoin() {
         if (fw.empty() or bw.empty())
             continue;
 
-        int best_cost = objective->join(forward_best[node]->getObjective(), backward_best[node]->getObjective(), node);
+        cost_t best_cost = objective->join(forward_best[node]->getObjective(), backward_best[node]->getObjective(), node);
         
         if (best_cost > incumbent) 
             continue;
@@ -859,7 +940,7 @@ void LMBucket::orderedNodeJoin() {
                 break;
 
             for (auto &label_backward : bw) {
-                int cost = objective->join(label_forward->getObjective(), label_backward->getObjective(), node);
+                cost_t cost = objective->join(label_forward->getObjective(), label_backward->getObjective(), node);
                 if (cost > incumbent) 
                     break;
 
@@ -868,6 +949,100 @@ void LMBucket::orderedNodeJoin() {
                     incumbent = cost;
                     joinable_labels.insert(std::make_tuple(cost, label_forward, label_backward));
                     break;
+                }
+            }
+        }
+    }
+}
+
+void LMBucket::bucketNodeJoin() {
+
+    auto objective = problem->getObj();
+    joinComparisons = 0;
+    cost_t cost;
+
+    auto bucket_resource = problem->getRes(bucket_resource_id);
+
+    for (int node = 0; node < problem->getNumNodes(); node++){
+        fw_nonempty.clear();
+        bw_nonempty.clear();
+        
+        for (auto bucket_idx = 0; bucket_idx < bucket_count; ++bucket_idx){
+            if (not fw_bucket[bucket_idx][node].empty())
+                fw_nonempty.push_back(bucket_idx);
+            if (not bw_bucket[bucket_idx][node].empty())
+                bw_nonempty.push_back(bucket_idx);
+        }
+        
+        for (auto it_idx_fw = fw_nonempty.rbegin(); it_idx_fw != fw_nonempty.rend(); it_idx_fw++){
+            auto idx_fw = *it_idx_fw;
+            for (auto it_idx_bw = bw_nonempty.rbegin(); it_idx_bw != bw_nonempty.rend(); it_idx_bw++){
+                auto idx_bw = *it_idx_bw;
+                if (not bucket_resource->isFeasible(bucket_resource->join(
+                    min_consumption_at_bucket[idx_fw], min_consumption_at_bucket[idx_bw], node)))
+                    continue;
+
+                for(auto &label_forward : fw_bucket[idx_fw][node]){
+                    for(auto &label_backward : bw_bucket[idx_bw][node]){
+                        cost = objective->join(label_forward.getObjective(), label_backward.getObjective(), node);
+                        if (cost >= incumbent) 
+                            break;
+                        joinComparisons++;
+                        if(isNodeJoinFeasible(&label_forward, &label_backward)){
+                            incumbent = cost;
+                            joinable_labels.insert(std::make_tuple(cost, &label_forward, &label_backward));
+                            break;
+                        }
+                    } 
+                }
+            }
+        }
+    }
+}
+
+void LMBucket::ksol_bucketNodeJoin() {
+
+    auto objective = problem->getObj();
+    cost_t kth_cost = MAX_COST;
+    joinComparisons = 0;
+
+    auto bucket_resource = problem->getRes(bucket_resource_id);
+
+    for (int node = 0; node < problem->getNumNodes(); node++){
+        fw_nonempty.clear();
+        bw_nonempty.clear();
+        
+        for (auto bucket_idx = 0; bucket_idx < bucket_count; ++bucket_idx){
+            if (not fw_bucket[bucket_idx][node].empty())
+                fw_nonempty.push_back(bucket_idx);
+            if (not bw_bucket[bucket_idx][node].empty())
+                bw_nonempty.push_back(bucket_idx);
+        }
+        
+        for (auto it_idx_fw = fw_nonempty.rbegin(); it_idx_fw != fw_nonempty.rend(); it_idx_fw++){
+            auto idx_fw = *it_idx_fw;
+            for (auto it_idx_bw = bw_nonempty.rbegin(); it_idx_bw != bw_nonempty.rend(); it_idx_bw++){
+                auto idx_bw = *it_idx_bw;
+                if (not bucket_resource->isFeasible(bucket_resource->join(
+                    min_consumption_at_bucket[idx_fw], min_consumption_at_bucket[idx_bw], node)))
+                    continue;
+                
+                for(auto &label_forward : fw_bucket[idx_fw][node]){
+                    for(auto &label_backward : bw_bucket[idx_bw][node]){
+                        cost_t cost = objective->join(label_forward.getObjective(), label_backward.getObjective(), node);
+                        if(cost > kth_cost)
+                            break;
+
+                        joinComparisons++;
+                        if(isNodeJoinFeasible(&label_forward, &label_backward)){
+                            if(cost < incumbent) incumbent = cost;
+                            joinable_labels.insert(std::make_tuple(cost, &label_forward, &label_backward));
+                            if(joinable_labels.size() > requested_solutions) {
+                                joinable_labels.erase(std::prev(joinable_labels.end()));
+                                kth_cost = std::get<0>(*std::prev(joinable_labels.end()));
+                            }
+                        }
+                    } 
                 }
             }
         }
@@ -908,7 +1083,7 @@ bool LMBucket::isJoinFeasible(LabelAdv* label_forward, LabelAdv* label_backward)
             return false;
     }
 
-    return (label_forward->getVisited() & label_backward->getVisited()).none();
+    return not intersects(label_forward->getVisited(), label_backward->getVisited());
 
 }
 
@@ -933,20 +1108,37 @@ bool LMBucket::isNodeJoinFeasible(LabelAdv* label_forward, LabelAdv* label_backw
             return false;
     }
 
-    auto mask = label_forward->getVisited() & label_backward->getVisited();
-    mask.reset(node);
-    return mask.none();
+    return not intersects_except(label_forward->getVisited(), label_backward->getVisited(), node);
 
 }
 
 
 /** Solution management +*/
 //Return a solution
-std::tuple<int, LabelAdv*, LabelAdv*> LMBucket::getSolutionLabels() {
-    std::tuple<int, LabelAdv*, LabelAdv*> solution_data = {0, nullptr, nullptr};
+std::tuple<cost_t, LabelAdv*, LabelAdv*> LMBucket::getSolutionLabels() {
+    std::tuple<cost_t, LabelAdv*, LabelAdv*> solution_data = {0, nullptr, nullptr};
 
-    if(bidirectional and joinFound())
+    if(bidirectional and joinFound()) {
         solution_data = getBestJoin();
+        cost_t best_objective = std::get<0>(solution_data);
+        int best_rank = MAX_INT;
+
+        //Among joins with the best objective, prefers elementary paths, then NG-routes
+        for (auto & join : joinable_labels) {
+            if (std::get<0>(join) != best_objective)
+                break;
+
+            int rank = getJoinRank(std::get<1>(join), std::get<2>(join));
+            if (rank < best_rank) {
+                best_rank = rank;
+                solution_data = join;
+
+                //An elementary path cannot be improved
+                if (best_rank == 0)
+                    break;
+            }
+        }
+    }
     else {
         LabelAdv* candidate = getODLabel();
         if(candidate){
@@ -956,6 +1148,50 @@ std::tuple<int, LabelAdv*, LabelAdv*> LMBucket::getSolutionLabels() {
     }
 
     return solution_data;
+}
+
+int LMBucket::getJoinRank(LabelAdv* label_forward, LabelAdv* label_backward){
+    //Builds the tour of the joined path
+    std::list<int> tour;
+    bool node_join = label_forward->getNode() == label_backward->getNode();
+
+    Label* label = label_forward;
+    while(label != nullptr){
+        tour.push_front(label->getNode());
+        label = label->getPredecessor();
+    }
+
+    label = node_join ? label_backward->getPredecessor() : label_backward;
+    while(label != nullptr){
+        tour.push_back(label->getNode());
+        label = label->getPredecessor();
+    }
+
+    //Checks elementarity and NG-route compliance
+    std::vector<bool> visited(problem->getNumNodes(), false);
+    Bitset memory(problem->getNumNodes());
+    bool elementary = true;
+    bool ng_route = unreachable_ng and not unreachable_ng->empty();
+
+    for(int node: tour) {
+        if(visited[node])
+            elementary = false;
+        if(ng_route and memory.get(node))
+            ng_route = false;
+        if(not elementary and not ng_route)
+            return 2;
+
+        visited[node] = true;
+        if(ng_route) {
+            memory &= (*unreachable_ng)[node];
+            memory.set(node);
+        }
+    }
+
+    //Rank 0: elementary path, rank 1: NG-route, rank 2: any other path
+    if(elementary)
+        return 0;
+    return ng_route ? 1 : 2;
 }
 
 void LMBucket::sortLabelsInQueue(bool direction, int node) {
@@ -1045,10 +1281,10 @@ void LMBucket::initLabelDataCollection(DataCollector* collector_label) {
     collector_label->init("direction", 0);
     collector_label->init("node", -1);
     collector_label->init("predecessor", -1);
-    collector_label->init("objective", UNKNOWN);
-    collector_label->init("consumption_critical", UNKNOWN);
+    collector_label->init("objective", MAX_COST);
+    collector_label->init("consumption_critical", MAX_INT);
     for(int i = 1; i < problem->getNumRes(); i++)
-        collector_label->init("consumption_"+std::to_string(i), UNKNOWN);
+        collector_label->init("consumption_"+std::to_string(i), MAX_INT);
     collector_label->init("tour_length", -1);
     collector_label->init("nvisited", -1);
     collector_label->init("nunreachable", -1);
@@ -1089,6 +1325,8 @@ void LMBucket::collectData() {
         case JOIN_ORDERED_NODE:  join_algo_st = "ordered (node)"; break;
         case JOIN_KORDERED:  join_algo_st = "kordered (arc)"; break;
         case JOIN_KORDERED_NODE:  join_algo_st = "kordered (node)"; break;
+        case JOIN_BUCKET_NODE:  join_algo_st = "bucket (node)"; break;
+        case JOIN_KBUCKET_NODE:  join_algo_st = "kbucket (node)"; break;
         default: join_algo_st = "default"; break;
     }
     collector.collect("join_algo", join_algo_st);

@@ -37,13 +37,13 @@ public:
 
     /** Solution management **/
     //Solution process
-    bool updateIncumbent(int value);
-    void setIncumbent(int value){incumbent = value;}
-    int getIncumbent(){return incumbent;}
+    bool updateIncumbent(cost_t value);
+    void setIncumbent(cost_t value){incumbent = value;}
+    cost_t getIncumbent(){return incumbent;}
 
-    bool updateLowerBound(int value);
-    void setLowerBound(int value){lower_bound = value;}
-    int getLowerBound(){return lower_bound;}
+    bool updateLowerBound(cost_t value);
+    void setLowerBound(cost_t value){lower_bound = value;}
+    cost_t getLowerBound(){return lower_bound;}
 
     double getGlobalTime(){return collector.getGlobalTime();}
 
@@ -54,7 +54,7 @@ public:
     void updateBestSolution(int id){best_solution_id = id;}
     std::vector<Path> & getSolutions() {return solutions;}
     void addSolution(Path & path);
-    void buildPath(int objective, Label* forward_label, Label* backward_label = nullptr);
+    void buildPath(cost_t objective, Label* forward_label, Label* backward_label = nullptr);
     void clearSolutions() {solutions.clear(); best_solution_id = -1;}
     /** Output management **/
     void printStatus();
@@ -86,8 +86,8 @@ protected:
     int executionID;
     int iterations;
     int algo_status;
-    int incumbent;
-    int lower_bound;
+    cost_t incumbent;
+    cost_t lower_bound;
     float timelimit;
     bool timeout;
 

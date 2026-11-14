@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 20)
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	set(CMAKE_CXX_FLAGS  "/O2 /w  /DNDEBUG")
 else()
-	set(CMAKE_CXX_FLAGS  "-O3 -w -pthread -fopenmp -DNDEBUG")
+	set(CMAKE_CXX_FLAGS  "-O3 -w -pthread -fopenmp -DNDEBUG -fno-semantic-interposition")
 endif()
 
 #Project information
@@ -88,6 +88,12 @@ else()
 endif()
 
 target_include_directories(pathwyse_core PUBLIC core)
+
+include(CheckIPOSupported)
+check_ipo_supported(RESULT ipo_supported OUTPUT ipo_error)
+if (ipo_supported)
+    set_property(TARGET pathwyse_core PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif()
 
 set(SOURCE_FILES_STANDALONE
         standalone/main.cpp

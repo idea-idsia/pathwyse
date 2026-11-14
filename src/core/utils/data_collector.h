@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <list>
 #include <iostream>
+#include <type_traits>
 
 class DataCollector {
 
@@ -30,32 +31,23 @@ public:
     /** Initialize collection of a value **/
 
     //init (single value)
-    void init(std::string tag, int value);
+    template<typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
+    void init(std::string tag, T value) {initInteger(tag, value);}
+    void initInteger(std::string tag, long long value);
     void init(std::string tag, std::string value);
     void init(std::string tag, double value);
     void initTime(std::string tag, double value = 0);
 
-    //init (multiple values)
-    void init(std::vector<std::string> tags, std::vector<int> values);
-    void init(std::vector<std::string> tags, std::vector<std::string> values);
-    void init(std::vector<std::string> tags, std::vector<double> values);
     void initTimes(std::vector<std::string> & tags);
 
-    /** Collect and increment a value **/
+    /** Collect a value **/
 
     //Collect (single value)
-    void collect(std::string tag, int value);
+    template<typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
+    void collect(std::string tag, T value) {collectInteger(tag, value);}
+    void collectInteger(std::string tag, long long value);
     void collect(std::string tag, std::string value);
     void collect(std::string tag, double value);
-
-    //Collect (multiple values)
-    void collect(std::vector<std::string> tags, std::vector<int> values);
-    void collect(std::vector<std::string> tags, std::vector<std::string> values);
-    void collect(std::vector<std::string> tags, std::vector<double> values);
-
-    //Increment values
-    void increment(std::string tag, int value);
-    void increment(std::string tag, double value);
 
     /** Time profile management **/
 
@@ -75,7 +67,6 @@ public:
 
     /** Reset values and clear data structures **/
     void reset(std::vector<std::string> tags);
-
     void resetText(int id) {text[id] = "";}
     void resetTime(std::string tag, double value = 0);
 
@@ -104,14 +95,12 @@ public:
     void resetTimeCumulative(int id){times_cumulative[id] = 0;}
 
     //Integers
-    void setInteger(int id, int value){this->integers[id] = value;}
-    void incrementInteger(int id, int value) {integers[id] += value;}
-    int getInt(int id) {return integers[id];}
+    void setInteger(int id, long long value){this->integers[id] = value;}
+    long long getInt(int id) {return integers[id];}
     void resetInteger(int id) {integers[id] = 0;}
 
     //Decimals
     void setDecimal(int id, double value){decimals[id] = value;}
-    void incrementDecimal(int id, double value) {decimals[id] += value;}
     double getDecimal(int id) {return decimals[id];}
     void resetDecimal(int id) {decimals[id] = 0;}
 
@@ -172,7 +161,7 @@ private:
     std::vector<std::string> tag_times;
 
     //Integers
-    std::vector<int> integers;
+    std::vector<long long> integers;
     std::vector<std::string> tag_integers;
 
     //Decimals

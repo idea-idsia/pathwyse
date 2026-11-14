@@ -9,7 +9,7 @@
  */
 Solver::Solver() {
     setStatus(SOLVER_START);
-    solver_version = "1.0";
+    solver_version = "1.1";
     optimization_round = 0;
     init_cost = 0;
     problem = new Problem();
@@ -408,7 +408,7 @@ int Solver::getSolutionStatus(int id) {
  * @return double - Solution objective.
  */
 double Solver::getSolutionObjective(int id){
-    if (id >= (int)solutions.size()) return UNKNOWN;
+    if (id >= (int)solutions.size()) return MAX_DOUBLE;
     return init_cost + (solutions[id].getObjective() / problem->getCostScaleFactor());
 }
 
@@ -419,7 +419,7 @@ double Solver::getSolutionObjective(int id){
  * @return double - Solution arc cost.
  */
 double Solver::getSolutionArcCost(int id) {
-    return id < solutions.size() ? solutions[id].getArcCost()/problem->getCostScaleFactor() : UNKNOWN;
+    return id < solutions.size() ? solutions[id].getArcCost()/problem->getCostScaleFactor() : MAX_DOUBLE;
 }
 
 /**
@@ -429,7 +429,7 @@ double Solver::getSolutionArcCost(int id) {
  * @return double - Solution node cost.
  */
 double Solver::getSolutionNodeCost(int id) {
-    return id < solutions.size() ? solutions[id].getNodeCost()/problem->getCostScaleFactor() : UNKNOWN;
+    return id < solutions.size() ? solutions[id].getNodeCost()/problem->getCostScaleFactor() : MAX_DOUBLE;
 }
 
 /**

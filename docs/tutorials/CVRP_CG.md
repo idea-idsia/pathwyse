@@ -69,7 +69,7 @@ The `pathwyse.set` file in the example folder (`examples/cvrp_python/pathwyse.se
 - **Algorithm 1** — `PWDefaultRelaxDom`: heuristic variant with relaxed dominance.
 - **Algorithm 2** — `PWDefaultRelaxQueue`: heuristic variant with bounded label queues.
 
-It also sets `problem/decimal_digits = 2`, which tells PathWyse to scale all floating-point costs to integers by multiplying by $10^2 = 100$. This is necessary because the dual variables coming from the master problem solver are real-valued, while PathWyse operates on integer costs internally. The scaling factor must be large enough to preserve the relevant decimal precision of the input data.
+It also sets `problem/decimal_digits = 2`, which tells PathWyse to scale all floating-point costs to integers by multiplying by $10^2 = 100$. This is necessary because the dual variables coming from the master problem solver are real-valued, while PathWyse operates on integer costs internally. The scaling factor must be large enough to preserve the relevant decimal precision of the input data. Since PathWyse stores costs as 64-bit integers, more decimal digits can be used if needed, as long as the total stays within 12 digits: for example, with costs below 10,000, up to 8 decimal digits.
 
 ## Updating reduced costs
 

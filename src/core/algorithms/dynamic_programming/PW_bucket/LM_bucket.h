@@ -25,6 +25,9 @@ public:
     void setName(std::string name) {this->name = name; collector.setCollectionName(name);}
     void setProblem(Problem* problem) {this->problem = problem;}
     void setCompareUnreachables(bool compare_unreachables) {this->compare_unreachables = compare_unreachables;}
+    void setUnreachables(std::vector<Bitset>* unreachable_active) {this->unreachable_active = unreachable_active;}
+    void setUnreachablesNG(std::vector<Bitset>* unreachable_ng) {this->unreachable_ng = unreachable_ng;}
+    int getCompareUnreachables(){return compare_unreachables;}
 
     //Bidirectional budget management
     void update_split();
@@ -32,8 +35,8 @@ public:
     double getSplit() {return split_ratio;}
 
     //Incumbent
-    int getIncumbent(){return incumbent;}
-    void setIncumbent(int incumbent){this->incumbent = incumbent;}
+    cost_t getIncumbent(){return incumbent;}
+    void setIncumbent(cost_t incumbent){this->incumbent = incumbent;}
 
     //Queries
     int getForwardSize() {return ninserted_fw - ndominated_fw;}
@@ -52,11 +55,13 @@ public:
     bool isCriticalExtensionFeasible(LabelAdv *label, int next_node);
     void extendLabel(LabelAdv *current_label, LabelAdv *new_label, int next_node);
     void updateUnreachables(LabelAdv *label);
+    void updateMaskedNeighbors();
     LabelAdv* getWorkingLabel(bool direction, int node) {return direction? &forward_tmp[node] : &backward_tmp[node];}
 
     //Label insertion
     LabelAdv* insert(LabelAdv *new_label);
-    bool dominates(LabelAdv *l1, LabelAdv *l2);
+    FORCE_INLINE bool dominates(LabelAdv *l1, LabelAdv *l2);
+    NO_INLINE bool dominatesTwoCycle(LabelAdv *l1, LabelAdv *l2);
 
     /** Join **/
     void join();
@@ -66,6 +71,8 @@ public:
     void orderedNodeJoin();
     void ksol_orderedJoin();
     void ksol_orderedNodeJoin();
+    void bucketNodeJoin();
+    void ksol_bucketNodeJoin();
 
     void populateQueues();
     bool isJoinFeasible(LabelAdv* forward, LabelAdv* backward);         //Checks if two labels can be joined
@@ -73,11 +80,12 @@ public:
 
     bool joinFound() {return not joinable_labels.empty();}      //Checks if a join was found
 
-    std::tuple<int, LabelAdv*, LabelAdv*> getBestJoin() {return *joinable_labels.begin();}       //returns best join
-    std::multiset<std::tuple<int, LabelAdv*, LabelAdv*>> getAllJoin() {return joinable_labels;}
+    std::tuple<cost_t, LabelAdv*, LabelAdv*> getBestJoin() {return *joinable_labels.begin();}       //returns best join
+    std::multiset<std::tuple<cost_t, LabelAdv*, LabelAdv*>> getAllJoin() {return joinable_labels;}
 
     /** Solution management **/
-    std::tuple<int, LabelAdv*, LabelAdv*> getSolutionLabels();
+    std::tuple<cost_t, LabelAdv*, LabelAdv*> getSolutionLabels();
+    int getJoinRank(LabelAdv* label_forward, LabelAdv* label_backward);
     LabelAdv* getODLabel(){return od_label;}
     void sortLabelsInQueue(bool direction, int node);
     const std::vector<LabelAdv*>& getLabelsInQueue(bool direction, int node);
@@ -120,8 +128,11 @@ protected:
 
     int requested_solutions;
     double split_ratio;
-    int incumbent;
+    cost_t incumbent;
     bool compare_unreachables;
+    std::vector<Bitset>* unreachable_active = nullptr;
+    std::vector<Bitset>* unreachable_ng = nullptr;
+    std::vector<std::vector<int>> masked_neighbors_fw, masked_neighbors_bw;
     bool two_cycle_elimination;
 
     int ninserted_fw, ninserted_bw;
@@ -136,7 +147,7 @@ protected:
     std::vector<LabelAdv> forward_tmp, backward_tmp;        //Tmp Labels (for insertion)
     std::vector<LabelAdv*> forward_best, backward_best;     //Best overall LabelAdv for each node
 
-    std::multiset<std::tuple<int, LabelAdv*, LabelAdv*>> joinable_labels;   //Joinable label pairs
+    std::multiset<std::tuple<cost_t, LabelAdv*, LabelAdv*>> joinable_labels;   //Joinable label pairs
 
     // Bucket data structures
 
@@ -152,6 +163,8 @@ protected:
     bool fw_ptr_unset, bw_ptr_unset;                                    // Bucket iterator initialization flag
 
     std::vector<std::vector<LabelAdv*>> fw_queue, bw_queue;             // Label pools (queue, for each node) for join operations
+
+    std::vector<int> min_consumption_at_bucket, fw_nonempty, bw_nonempty; // Helpers for bucketNodeJoin
 
     //Data collection
     int executionID;

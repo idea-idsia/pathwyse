@@ -90,7 +90,8 @@ bool Preprocessing::solveRound(bool direction, int res_id, double bounding){
     else preprocess = false;
 
     collector.stopGlobalTime();
-    collector.increment("iterations", 1);
+    iterations++;
+    collector.collect("iterations", iterations);
 
     collectData();
     return preprocess;
@@ -106,7 +107,7 @@ void Preprocessing::resetAlgorithm(int reset_level) {
 double Preprocessing::getSplit() {
     double fw_cost = 0, bw_cost = 0;
     BoundLabels* bound_labels = problem->getBoundLabels();
-    if(bound_labels->getLabel(RES_COST, true, problem->getOrigin())->getObjective() == UNKNOWN)
+    if(bound_labels->getLabel(RES_COST, true, problem->getOrigin())->getObjective() == MAX_COST)
         return 0.5;
 
     for (int node = 0; node < problem->getNumNodes(); node++) {

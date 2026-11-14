@@ -88,7 +88,7 @@ def resetAlgorithm(self, id, reset_level)
 Resets the algorithm with the given id to an unoptimized state.
 
 - **id** *(int)* — algorithm id.
-- **reset_level** *(int)* — should be `0`; not used in PathWyse 1.0.
+- **reset_level** *(int)* — should be `0`; not used in PathWyse 1.1.
 
 #### resetAllAlgorithms
 
@@ -98,7 +98,7 @@ def resetAllAlgorithms(self, reset_level)
 
 Resets all algorithms to an unoptimized state.
 
-- **reset_level** *(int)* — should be `0`; not used in PathWyse 1.0.
+- **reset_level** *(int)* — should be `0`; not used in PathWyse 1.1.
 
 ---
 

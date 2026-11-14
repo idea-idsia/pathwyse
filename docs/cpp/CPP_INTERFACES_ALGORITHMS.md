@@ -121,7 +121,7 @@ void resetAlgorithm(int id, int reset_level)
 Resets the algorithm with the given id to an unoptimized state.
 
 - **id** *(int)* — algorithm id.
-- **reset_level** *(int)* — should be `0`; not used in PathWyse 1.0.
+- **reset_level** *(int)* — should be `0`; not used in PathWyse 1.1.
 
 #### resetAllAlgorithms
 
@@ -131,7 +131,7 @@ void resetAllAlgorithms(int reset_level)
 
 Resets all algorithms to an unoptimized state.
 
-- **reset_level** *(int)* — should be `0`; not used in PathWyse 1.0.
+- **reset_level** *(int)* — should be `0`; not used in PathWyse 1.1.
 
 ---
 

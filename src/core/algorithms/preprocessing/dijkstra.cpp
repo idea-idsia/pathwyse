@@ -9,8 +9,8 @@
 */
 Dijkstra::Dijkstra(std::string name, Problem* problem): Algorithm(name, problem) {
     visited = Bitset(problem->getNumNodes());
-    distances.resize(problem->getNumNodes(), UNKNOWN);
-    lower_bound = INFMINUS;
+    distances.resize(problem->getNumNodes(), MAX_COST);
+    lower_bound = MIN_COST;
     obj = problem->getObj();
     resources = problem->getResources();
 
@@ -18,7 +18,7 @@ Dijkstra::Dijkstra(std::string name, Problem* problem): Algorithm(name, problem)
     round = 0;
 
     //Init incumbent solution (cost, label 1, label 2)
-    solution_data =  std::make_tuple(UNKNOWN, nullptr, nullptr);
+    solution_data =  std::make_tuple(MAX_COST, nullptr, nullptr);
     setStatus(ALGO_READY);
 }
 
@@ -38,8 +38,9 @@ void Dijkstra::initAlgorithm(bool direction, int res_id, double bounding) {
     destination = direction ? problem->getDestination() : problem->getOrigin();
     labels = res_id == RES_COST ? bound_labels->getCostLabels(direction) : bound_labels->getConsumptionLabels(res_id, direction);
 
-    auto * current_res = res_id == RES_COST ? problem->getObj() : problem->getRes(res_id);
-    switch(current_res->getData()->getCoordDistanceType()) {
+    int coord_distance_type = res_id == RES_COST ? problem->getObj()->getData()->getCoordDistanceType()
+                                                 : problem->getRes(res_id)->getData()->getCoordDistanceType();
+    switch(coord_distance_type) {
         case DIST_2D: coord_distance_algo = DIST_ALGO_EUCLIDEAN; break;
         case DIST_GEOGRAPHIC: coord_distance_algo = DIST_ALGO_EQUIRECTANGULAR; break;
         default: coord_distance_algo = DIST_ALGO_NONE; break;
@@ -54,8 +55,9 @@ void Dijkstra::solve() {
     setStatus(ALGO_OPTIMIZING);
 
     // Cost of Dijkstra algorithm
-    int dijkstra_cost;
+    cost_t dijkstra_cost;
     // Temporary values for obj/resource cost/consumption for current label and new labels
+    cost_t current_obj, new_obj;
     int current_value, new_value;
 
     Label new_label;
@@ -118,9 +120,9 @@ void Dijkstra::solve() {
                 int j = direction ? node : current_label->getNode();
 
                 //Update Objective for new label
-                current_value = current_label->getObjective();
-                new_value = obj->extend(current_value, i, j, direction);
-                new_label.setObjective(new_value);
+                current_obj = current_label->getObjective();
+                new_obj = obj->extend(current_obj, i, j, direction);
+                new_label.setObjective(new_obj);
 
                 //If Dijkstra is minimizing objective cost, check if the new label is improving the minimum cost found at the node
                 if(res_id == RES_COST) {
@@ -190,11 +192,11 @@ void Dijkstra::solve() {
 * @param cost - The cost of the label.
 * @return True if the label is valid, False otherwise.
 */
-bool Dijkstra::isLabelValid(Label* l, int cost) {
+bool Dijkstra::isLabelValid(Label* l, cost_t cost) {
     if(res_id == RES_COST)
         return cost <= incumbent;
     else
-        return resources[res_id]->isFeasible(cost, l->getNode(), 1, l->getDirection());
+        return resources[res_id]->isFeasible((int)cost, l->getNode(), 1, l->getDirection());
 }
 
 /**
@@ -212,12 +214,13 @@ void Dijkstra::extendLabel(Label* current_label, Label & new_label, int next_nod
     int j = direction ? next_node : current_label->getNode();
 
     //Update Values
+    cost_t current_obj, new_obj;
     int current_value, new_value;
 
     //Update Objective
-    current_value = current_label->getObjective();
-    new_value = obj->extend(current_value, i, j, direction);
-    new_label.setObjective(new_value);
+    current_obj = current_label->getObjective();
+    new_obj = obj->extend(current_obj, i, j, direction);
+    new_label.setObjective(new_obj);
 
     //Update res
     for(int id = 0; id < problem->getNumRes(); id++){
@@ -247,7 +250,7 @@ bool Dijkstra::isCriticalLabelValid(Label* l){
 */
 void Dijkstra::resetAlgorithm(int reset_level) {
     visited.reset();
-    std::fill(distances.begin(), distances.end(), UNKNOWN);
+    std::fill(distances.begin(), distances.end(), MAX_COST);
     setStatus(ALGO_READY);
 }
 
@@ -287,7 +290,8 @@ void Dijkstra::joinCompletion(Label* current){
 */
 bool Dijkstra::joinLabels(Label* l1, Label* l2){
     int node = l1->getNode();
-    int cost, consumption;
+    cost_t cost;
+    int consumption;
 
     //Find the objective of the join
     if(direction)
@@ -333,13 +337,13 @@ void Dijkstra::checkFeasibility(){
         return;
 
     //If no path could reach the destination, the problem is infeasible
-    if(distances[destination] == UNKNOWN) {
+    if(distances[destination] == MAX_COST) {
         problem->setStatus(PROBLEM_INFEASIBLE);
         return;
     }
 
     //If a feasible solution was found, the problem is feasible
-    if(incumbent != UNKNOWN) {
+    if(incumbent != MAX_COST) {
         problem->setStatus(PROBLEM_FEASIBLE);
         return;
     }
@@ -361,7 +365,7 @@ void Dijkstra::checkFeasibility(){
 * Checks for optimality.
 */
 void Dijkstra::checkOptimality(){
-    if(res_id == RES_COST and distances[destination] != UNKNOWN)
+    if(res_id == RES_COST and distances[destination] != MAX_COST)
         lower_bound = distances[destination];
 
     if(lower_bound == incumbent)

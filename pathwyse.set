@@ -16,7 +16,7 @@ algo/preprocessing/critical  = 0
 
 # --- Algorithms Parameters ---------------------------------------------------
 
-algo_names    = PWDefault,PWDefaultRelaxDom,PWDefaultRelaxQueue
+algo_names    = PWDefault,PWBucket,PWDefaultRelaxQueue
 algo_active   = 1,0,0
 algo_parallel = 0
 
@@ -29,11 +29,11 @@ algo/default/reserve = 10000000
 
 algo/default/use_visited = 1
 algo/default/compare_unreachables = 1
-algo/two_cycle_elimination = 1
+algo/two_cycle_elimination = 0
 
-algo/default/ng = off
+algo/default/ng = standard
 algo/default/ng/set_size = 8
-algo/default/dssr = standard
+algo/default/dssr = restricted
 
 algo/default/candidate/type = node
 algo/default/join/type = ordered
@@ -43,9 +43,9 @@ algo/default/relaxations/queue_limit = 10
 # --- Bucket Algorithm Parameters ---------------------------------------------
 
 algo/bucket/resource = 0
-algo/bucket/size_mode = unit_size
+algo/bucket/size_mode = min_res_consumption
 algo/bucket/prev_dom_check_percentage = 1.0
-algo/bucket/next_dom_check_percentage = 1.0
+algo/bucket/next_dom_check_percentage = 0.0
 
 # --- Data Collection ---------------------------------------------------------
 

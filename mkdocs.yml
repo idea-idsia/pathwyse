@@ -47,6 +47,7 @@ nav:
     - Instance Format: documentation/INSTANCE.md
     - Architecture: documentation/architecture.md
     - Parameters: documentation/PARAMETERS_TABLE.md
+    - Suggested Settings: documentation/SUGGESTED_SETTINGS.md
     - Extras: documentation/EXTRAS.md
     - Publications: documentation/publications.md
   - C++ API:

@@ -27,8 +27,8 @@ void LMacyclic::initLM() {
     //Init Node Data Structure
     closed_f.resize(n_nodes, std::list<Label*>());
     closed_b.resize(n_nodes, std::list<Label*>());
-    min_consumption_f.resize(n_nodes, UNKNOWN);
-    min_consumption_b.resize(n_nodes, UNKNOWN);
+    min_consumption_f.resize(n_nodes, MAX_INT);
+    min_consumption_b.resize(n_nodes, MAX_INT);
 
     bool direction = true;
     Label* predecessor = nullptr;
@@ -46,8 +46,8 @@ void LMacyclic::initLM() {
     destinationLabel->setSnapshot(RES_CRITICAL, res->getInitValue() + res->getNodeCost(destination));
 
     //Add labels ids to buckets
-    int bucket_range = 1;
-    int bucket_init_value;
+    cost_t bucket_range = 1;
+    cost_t bucket_init_value;
     Label* cost_label;
 
     //Forward
@@ -192,12 +192,13 @@ void LMacyclic::extendLabel(Label* current_label, Label & new_label, int next_no
     int j = direction ? next_node : current_label->getNode();
 
     //Update Values
+    cost_t current_obj, new_obj;
     int current_value, new_value;
 
     //Update Objective
-    current_value = current_label->getObjective();
-    new_value = obj->extend(current_value, i, j, direction);
-    new_label.setObjective(new_value);
+    current_obj = current_label->getObjective();
+    new_obj = obj->extend(current_obj, i, j, direction);
+    new_label.setObjective(new_obj);
 
     //Update res
     current_value = current_label->getSnapshot(RES_CRITICAL);
@@ -223,7 +224,7 @@ bool LMacyclic::insert(Label& candidate) {
     auto cost_label_opp = bound_labels->getLabel(RES_COST, not direction, node);
     auto res_label_opp = bound_labels->getLabel(RES_CRITICAL, not direction, node);
 
-    int value = candidate.getObjective() + cost_label_opp->getObjective();
+    cost_t value = candidate.getObjective() + cost_label_opp->getObjective();
 
     if(value > incumbent)
         return false;
@@ -273,7 +274,7 @@ bool LMacyclic::earlyUpdate(Label *candidate) {
     bool direction = candidate->getDirection();
     auto cost_label_opp = bound_labels->getLabel(RES_COST, not direction, node);
 
-    int value = obj->join(candidate->getObjective(), cost_label_opp->getObjective(), node);
+    cost_t value = obj->join(candidate->getObjective(), cost_label_opp->getObjective(), node);
     int res_consumption = candidate->getSnapshot(RES_CRITICAL) + cost_label_opp->getSnapshot(RES_CRITICAL);
 
     if(value >= incumbent)
@@ -315,7 +316,8 @@ void LMacyclic::join(Label* current) {
     }
 
     if(not opposite_closed.empty()) {
-        int cost, consumption;
+        cost_t cost;
+        int consumption;
         for (auto* closed: opposite_closed) {
             cost = obj->join(current->getObjective(),closed->getObjective(), node);
             if(cost > incumbent)

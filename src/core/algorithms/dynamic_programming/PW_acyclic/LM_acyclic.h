@@ -22,11 +22,11 @@ public:
     //Support methods
     void setName(std::string name) {this->name = name; collector.setCollectionName(name);}
 
-    int getBucketValueF() {return pos_f + offset_f;}
-    int getBucketValueB() {return pos_b + offset_b;}
+    cost_t getBucketValueF() {return pos_f + offset_f;}
+    cost_t getBucketValueB() {return pos_b + offset_b;}
 
-    void setIncumbent(int incumbent) {this->incumbent = incumbent;}
-    int getIncumbent(){return incumbent;}
+    void setIncumbent(cost_t incumbent) {this->incumbent = incumbent;}
+    cost_t getIncumbent(){return incumbent;}
 
     void eraseCandidate(Label* candidate) {delete candidate;}
     void closeLabel(Label* current);
@@ -48,7 +48,7 @@ public:
 
     /** Join management **/
     void join(Label* current_label);
-    std::tuple<int, Label, Label>* getJoin() {return &best_label_pair;}       //returns best join
+    std::tuple<cost_t, Label, Label>* getJoin() {return &best_label_pair;}       //returns best join
 
     /** Data collection management **/
     void initDataCollection();
@@ -60,14 +60,14 @@ private:
 
     //Problem Data
     Problem* problem;
-    Resource* obj;
+    CostResource* obj;
     Resource* res;
 
-    //Buckets
+    //Buckets (one per objective value)
     std::vector<std::list<Label*>> bucket_f, bucket_b;
     std::vector<std::list<Label*>> closed_f, closed_b;
     int pos_f, pos_b;
-    int offset_f, offset_b;
+    cost_t offset_f, offset_b;
 
     //Split
     double split_ratio;
@@ -76,8 +76,8 @@ private:
     std::vector<int> min_consumption_f, min_consumption_b;
 
     //Solution Data
-    int incumbent;
-    std::tuple<int, Label, Label> best_label_pair;
+    cost_t incumbent;
+    std::tuple<cost_t, Label, Label> best_label_pair;
 
     //Completion labels
     BoundLabels* bound_labels;

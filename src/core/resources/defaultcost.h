@@ -3,16 +3,16 @@
 
 #include "resource.h"
 
-class DefaultCost: public Resource {
+class DefaultCost: public CostResource {
 
 public:
     DefaultCost();
     ~DefaultCost() = default;
 
-    int extend(int current_value, int i, int j, bool direction) override;
-    int join(int current_value_forward, int current_value_backward, int i, int j) override;
-    int join(int current_value_forward, int current_value_backward, int node) override;
-    bool isFeasible(int current_value, int current_node, double bounding, bool direction) override;
+    cost_t extend(cost_t current_value, int i, int j, bool direction) override;
+    cost_t join(cost_t current_value_forward, cost_t current_value_backward, int i, int j) override;
+    cost_t join(cost_t current_value_forward, cost_t current_value_backward, int node) override;
+    bool isFeasible(cost_t current_value, int current_node, double bounding, bool direction) override;
 };
 
 

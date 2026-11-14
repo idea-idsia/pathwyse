@@ -101,7 +101,6 @@ std::string DataCollector::getDataStructure(std::string &tag) {
     return "not found";
 }
 
-
 /** Initialize collection of a value **/
 
 //Inits (single value)
@@ -110,7 +109,7 @@ void DataCollector::init(std::string tag, std::string value) {
     text[index] = std::move(value);
 }
 
-void DataCollector::init(std::string tag, int value){
+void DataCollector::initInteger(std::string tag, long long value){
     int index = addDictionary(tag, INTEGER);
     integers[index] = value;
 }
@@ -126,26 +125,12 @@ void DataCollector::initTime(std::string tag, double value) {
     times_cumulative[index] = value;
 }
 
-//Inits (multiple values)
-void DataCollector::init(std::vector<std::string> tags, std::vector<std::string> values) {
-    for(int i = 0; i < tags.size(); i++)
-        init(tags[i], values[i]);
-}
-void DataCollector::init(std::vector<std::string> tags, std::vector<int> values) {
-    for(int i = 0; i < tags.size(); i++)
-        init(tags[i], values[i]);
-}
-void DataCollector::init(std::vector<std::string> tags, std::vector<double> values) {
-    for(int i = 0; i < tags.size(); i++)
-        init(tags[i], values[i]);
-}
-
 void DataCollector::initTimes(std::vector<std::string> & tags) {
     for(auto & t: tags)
         initTime(t);
 }
 
-/** Collect and increment a value **/
+/** Collect a value **/
 
 //Collect (single value)
 void DataCollector::collect(std::string tag, std::string value){
@@ -154,7 +139,7 @@ void DataCollector::collect(std::string tag, std::string value){
         text[index] = std::move(value);
 }
 
-void DataCollector::collect(std::string tag, int value){
+void DataCollector::collectInteger(std::string tag, long long value){
     int index = findIndex(tag, INTEGER);
     if(index >= 0)
         integers[index] = value;
@@ -164,35 +149,6 @@ void DataCollector::collect(std::string tag, double value){
     int index = findIndex(tag, DECIMALS);
     if(index >= 0)
         decimals[index] = value;
-}
-
-//Collect (multiple values)
-void DataCollector::collect(std::vector<std::string> tags, std::vector<std::string> values) {
-    for(int i = 0; i < tags.size(); i++)
-        collect(tags[i], values[i]);
-}
-
-void DataCollector::collect(std::vector<std::string> tags, std::vector<int> values) {
-    for(int i = 0; i < tags.size(); i++)
-        collect(tags[i], values[i]);
-}
-
-void DataCollector::collect(std::vector<std::string> tags, std::vector<double> values) {
-    for(int i = 0; i < tags.size(); i++)
-        collect(tags[i], values[i]);
-}
-
-//Increment values
-void DataCollector::increment(std::string tag, int value) {
-    int index = findIndex(tag, INTEGER);
-    if(index >= 0)
-        integers[index] += value;
-}
-
-void DataCollector::increment(std::string tag, double value) {
-    int index = findIndex(tag, DECIMALS);
-    if(index >= 0)
-        decimals[index] += value;
 }
 
 /** Time management **/
@@ -240,14 +196,12 @@ void DataCollector::setHeader(){
     for(auto & t: tag_text)
         header += t + ",";
 
-
     if(not tag_times.empty()) {
         header += tag_times[0] + ",global_time,";
 
         for(int i = 1; i < tag_times.size(); i++)
             header += tag_times[i] + "," + tag_times[i]  + "_cumulative,";
     }
-
 
     for(auto & t: tag_integers)
         header += t + ",";

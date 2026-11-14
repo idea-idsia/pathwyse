@@ -42,6 +42,7 @@ public:
     bool isDirected(){return directed;}
     bool isSymmetric(){return symmetric;}
     bool isGraphCyclic(){return cycles;}
+    bool hasNegativeCost(){return objective->hasNegativeCost();}
 
     //Memory saving information
     bool isDataCompressed(){return compress_data;}
@@ -68,7 +69,7 @@ public:
 
     /** Objective and Resource management **/
     //Objective initialization
-    void initObjective(Resource* objective = nullptr);
+    void initObjective(CostResource* objective = nullptr);
 
     //Resource management
     int addResource(std::string type);
@@ -79,7 +80,7 @@ public:
 
     //Resource/Objective data queries
     int getNumRes(){return resources.size();}
-    Resource* getObj() {return objective;}
+    CostResource* getObj() {return objective;}
     Resource* getRes(int position){return resources[position];}
     std::vector<Resource*> & getResources(){return resources;}
 
@@ -173,10 +174,10 @@ protected:
 
     //Objective and Resources
     int n_res;
-    Resource* objective;
+    CostResource* objective;
     std::vector<Resource*> resources;
 
-    //Cost scale factor (computed by scaleCosts(), used to convert int objective back to double)
+    //Cost scale factor (computed by scaleCosts(), used to convert cost_t objective back to double)
     double cost_scale_factor;
 
     //Completion Labels

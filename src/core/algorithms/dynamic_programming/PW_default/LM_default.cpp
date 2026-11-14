@@ -9,7 +9,7 @@ LMDefault::LMDefault(Problem* problem) {
     name = "label_manager";
     lm_type = "pqueue";
     this->problem = problem;
-    queue_limit = UNKNOWN;
+    queue_limit = MAX_INT;
 
     readConfiguration();
 
@@ -43,10 +43,10 @@ void LMDefault::initLM(){
     ndominated_fw = ndominated_bw = nclosed_fw = nclosed_bw = 0;
 
     //Data structures initialization
-    forward_candidates.resize(n_nodes, std::list<std::pair<int, int>>());
-    backward_candidates.resize(n_nodes, std::list<std::pair<int, int>>());
-    forward_closed.resize(n_nodes, std::vector<std::pair<int, int>>());
-    backward_closed.resize(n_nodes, std::vector<std::pair<int, int>>());
+    forward_candidates.resize(n_nodes, std::list<std::pair<cost_t, int>>());
+    backward_candidates.resize(n_nodes, std::list<std::pair<cost_t, int>>());
+    forward_closed.resize(n_nodes, std::vector<std::pair<cost_t, int>>());
+    backward_closed.resize(n_nodes, std::vector<std::pair<cost_t, int>>());
     forward_best.resize(n_nodes, nullptr);
     backward_best.resize(n_nodes, nullptr);
 
@@ -97,7 +97,7 @@ void LMDefault::initLM(){
 
     }
 
-    incumbent = UNKNOWN;
+    incumbent = MAX_COST;
     turn_forward = origin;
     turn_backward = destination;
     od_label.second = -1;
@@ -129,10 +129,12 @@ void LMDefault::readConfiguration() {
         }
 
         compare_unreachables = use_visited = active;
-        if (bidirectional and requested_solutions > 1 and (join_algo != JOIN_KORDERED or join_algo != JOIN_KORDERED_NODE)){
+        if (bidirectional and requested_solutions > 1){
             join_algo = join_type == JOIN_NODE ? JOIN_KORDERED_NODE : JOIN_KORDERED;
         }
     }
+
+    two_cycle_elimination = two_cycle_elimination and compare_unreachables;
 }
 
 void LMDefault::resetLM(){
@@ -151,7 +153,7 @@ void LMDefault::resetLM(){
     joinable_labels.clear();
     best_fw = nullptr;
     best_bw = nullptr;
-    incumbent = UNKNOWN;
+    incumbent = MAX_COST;
     collector_label_fw.clearSubsetRecords();
     collector_label_bw.clearSubsetRecords();
     ins_attempts_fw = ins_attempts_bw = 0;
@@ -219,7 +221,7 @@ LabelAdv* LMDefault::getCandidateRR(bool forward, bool backward){
     LabelAdv* candidate = nullptr;
     int index, position;
     bool direction;
-    int score = UNKNOWN;
+    cost_t score = MAX_COST;
     bool foundLabel = false;
 
     int turn;
@@ -271,7 +273,7 @@ LabelAdv* LMDefault::getCandidateNode(bool forward, bool backward) {
     LabelAdv* candidate = nullptr;
     int index, position;
     bool direction;
-    int score = UNKNOWN;
+    cost_t score = MAX_COST;
     bool foundLabel = false;
 
     int turn = forward? turn_forward : turn_backward;
@@ -381,12 +383,13 @@ void LMDefault::extendLabel(LabelAdv *current_label, LabelAdv *new_label, int ne
     int j = direction ? next_node : current_label->getNode();
 
     //Update Objective
-    int current_value, new_value;
-    current_value = current_label->getObjective();
-    new_value = objective->extend(current_value, i, j, direction);
-    new_label->setObjective(new_value);
+    cost_t current_obj, new_obj;
+    current_obj = current_label->getObjective();
+    new_obj = objective->extend(current_obj, i, j, direction);
+    new_label->setObjective(new_obj);
 
     //Update resources
+    int current_value, new_value;
     for(int id = 0; id < problem->getNumRes(); id++) {
         current_value = current_label->getSnapshot(id);
         new_value = resources[id]->extend(current_value, i, j, direction);
@@ -401,15 +404,37 @@ void LMDefault::updateUnreachables(LabelAdv *candidate) {
         short label_type = PARTIALLY_DOMINANT;
         int node = candidate->getNode();
         bool direction = candidate->getDirection();
-        std::vector<int> & neighbors = problem->getNeighbors(node, direction);
+        std::vector<int> & neighbors = direction ? masked_neighbors_fw[node] : masked_neighbors_bw[node];
         for(auto & neigh: neighbors)
             if(candidate->isReachable(neigh) and not isExtensionFeasible(candidate, neigh))
                 candidate->setUnreachable(neigh);
 
-        if (not isExtensionFeasible(candidate, predecessor))
+        if (two_cycle_elimination and
+            (predecessor == (direction ? problem->getOrigin() : problem->getDestination())
+             or not problem->isActiveNode(predecessor)
+             or not problem->areNeighbors(node, predecessor, direction)
+             or ((*unreachable_active)[node].get(predecessor) and not candidate->isReachable(predecessor))
+             or not isExtensionFeasible(candidate, predecessor)))
             label_type = DOMINANT;
 
         candidate->setLabelType(label_type);
+    }
+}
+
+void LMDefault::updateMaskedNeighbors() {
+    masked_neighbors_fw.assign(problem->getNumNodes(), {});
+    masked_neighbors_bw.assign(problem->getNumNodes(), {});
+    if(not use_visited or not unreachable_active or unreachable_active->empty())
+        return;
+
+    for(int node = 0; node < problem->getNumNodes(); node++) {
+        Bitset & mask = (*unreachable_active)[node];
+        for(int neigh: problem->getNeighbors(node, true))
+            if(mask.get(neigh))
+                masked_neighbors_fw[node].push_back(neigh);
+        for(int neigh: problem->getNeighbors(node, false))
+            if(mask.get(neigh))
+                masked_neighbors_bw[node].push_back(neigh);
     }
 }
 
@@ -434,7 +459,7 @@ LabelAdv* LMDefault::insert(LabelAdv* new_label) {
     const int node = new_label->getNode();
     const bool direction = new_label->getDirection();
 
-    const int objective = new_label->getObjective();
+    const cost_t objective = new_label->getObjective();
 
     auto & labels = direction ? forward_labels : backward_labels;
     auto & candidates = direction ? forward_candidates : backward_candidates;
@@ -569,6 +594,10 @@ bool LMDefault::dominates(LabelAdv* l1, LabelAdv* l2)  {
     if (not two_cycle_elimination)
         return true;
 
+    return dominatesTwoCycle(l1, l2);
+}
+
+bool LMDefault::dominatesTwoCycle(LabelAdv* l1, LabelAdv* l2)  {
     //if L1 is dominant, L2 can be discarded
     if (l1->getLabelType() == DOMINANT)
         return true;
@@ -589,6 +618,10 @@ bool LMDefault::dominates(LabelAdv* l1, LabelAdv* l2)  {
     //Otherwise, L2 cannot be discarded
     if(l2->getLabelType() == DOMINATED)
         return l2->getExtensionTarget() != l1_predecessor;
+
+    //if there is no arc from L2 node to L1 predecessor, then L2 can be discarded
+    if (not problem->areNeighbors(l2->getNode(), l1_predecessor, l2->getDirection()))
+        return true;
 
     //if L2 does not have resources to reach L1 predecessor, then L2 can be discarded
     if (not isExtensionFeasible(l2, l1_predecessor))
@@ -673,7 +706,7 @@ void LMDefault::restoreClosedLabels(){
 
 void LMDefault::naiveJoin(){
     auto objective = problem->getObj();
-    int cost;
+    cost_t cost;
     LabelAdv *label_forward, *label_backward;
     joinComparisons = 0;
 
@@ -699,7 +732,7 @@ void LMDefault::naiveJoin(){
 
 void LMDefault::classicJoin() {
     auto objective = problem->getObj();
-    int cost;
+    cost_t cost;
     LabelAdv *label_forward , *best_label_forward;
     LabelAdv *label_backward, *best_label_backward;
     joinComparisons = 0;
@@ -734,8 +767,8 @@ void LMDefault::classicJoin() {
 
 void LMDefault::orderedJoin(){
     auto objective = problem->getObj();
-    std::multiset<std::tuple<int, int, int>> orderedPairs;
-    int cost;
+    std::multiset<std::tuple<cost_t, int, int>> orderedPairs;
+    cost_t cost;
     int i, j;
 
     //Sort closed
@@ -780,6 +813,7 @@ void LMDefault::orderedJoin(){
                                 break;
                             }
                         }
+                        else break;
                     }
                 }
                 else break;
@@ -792,9 +826,9 @@ void LMDefault::orderedJoin(){
 
 void LMDefault::ksol_orderedJoin(){
     auto objective = problem->getObj();
-    std::multiset<std::tuple<int, int, int>> orderedPairs;
-    int kth_cost = UNKNOWN;
-    int cost;
+    std::multiset<std::tuple<cost_t, int, int>> orderedPairs;
+    cost_t kth_cost = MAX_COST;
+    cost_t cost;
     int i, j;
 
     //Sort closed
@@ -853,7 +887,7 @@ void LMDefault::ksol_orderedJoin(){
 
 void LMDefault::ksol_orderedNodeJoin(){
     auto objective = problem->getObj();
-    int kth_cost = UNKNOWN;
+    cost_t kth_cost = MAX_COST;
     joinComparisons = 0;
     LabelAdv *label_forward, *label_backward;
 
@@ -864,7 +898,7 @@ void LMDefault::ksol_orderedNodeJoin(){
         if(fw.empty() or bw.empty())
             continue;
 
-        int best_cost = objective->join(forward_best[node]->getObjective(), backward_best[node]->getObjective(), node);
+        cost_t best_cost = objective->join(forward_best[node]->getObjective(), backward_best[node]->getObjective(), node);
         if(best_cost > kth_cost)
             continue;
 
@@ -880,7 +914,7 @@ void LMDefault::ksol_orderedNodeJoin(){
 
             for(int j = 0; j < bw.size(); j++){
                 label_backward = &backward_labels[bw[j].second];
-                int cost = objective->join(label_forward->getObjective(), label_backward->getObjective(), node);
+                cost_t cost = objective->join(label_forward->getObjective(), label_backward->getObjective(), node);
                 if(cost > kth_cost)
                     break;
 
@@ -910,7 +944,7 @@ void LMDefault::orderedNodeJoin() {
         if (fw.empty() or bw.empty())
             continue;
 
-        int best_cost = objective->join(forward_best[node]->getObjective(), backward_best[node]->getObjective(), node);
+        cost_t best_cost = objective->join(forward_best[node]->getObjective(), backward_best[node]->getObjective(), node);
 
         if (best_cost > incumbent)
             continue;
@@ -927,7 +961,7 @@ void LMDefault::orderedNodeJoin() {
             for (int j = 0; j < bw.size(); j++){
                 label_backward = &backward_labels[bw[j].second];
 
-                int cost = objective->join(label_forward->getObjective(), label_backward->getObjective(), node);
+                cost_t cost = objective->join(label_forward->getObjective(), label_backward->getObjective(), node);
                 if (cost > incumbent)
                     break;
 
@@ -946,9 +980,9 @@ void LMDefault::orderedNodeJoin() {
 // Binary-search based Pareto pruning: exploits sorted (rows, cols) to discard whole
 // blocks of dominated pairs without enumerating them, converging on the best feasible join.
 // rows/cols represent the forward/backward label lists; start/end_row/col bound the sub-block explored.
-void LMDefault::paretoSearchBlock(Resource* objective, int node_fw, int node_bw,
-                                   std::vector<std::pair<int, int>>& rows,
-                                   std::vector<std::pair<int, int>>& cols,
+void LMDefault::paretoSearchBlock(CostResource* objective, int node_fw, int node_bw,
+                                   std::vector<std::pair<cost_t, int>>& rows,
+                                   std::vector<std::pair<cost_t, int>>& cols,
                                    int start_row, int end_row, int start_col, int end_col) {
 
     // Join cost and feasibility for a (fw, bw) pair on arc or node
@@ -968,7 +1002,7 @@ void LMDefault::paretoSearchBlock(Resource* objective, int node_fw, int node_bw,
     // If its cost already meets or exceeds the incumbent the entire block is suboptimal.
     LabelAdv* fw_label = &forward_labels [rows[start_row].second];
     LabelAdv* bw_label = &backward_labels[cols[start_col].second];
-    int cost           = joinCost(fw_label, bw_label);
+    cost_t cost        = joinCost(fw_label, bw_label);
     if (cost >= incumbent)
         return;
 
@@ -1153,7 +1187,7 @@ void LMDefault::paretoSearchBlock(Resource* objective, int node_fw, int node_bw,
 // Label sets are sorted by non-decreasing cost before the search (required invariant).
 // The overall best join found is stored in joinable_labels.
 void LMDefault::paretoArcJoin() {
-    incumbent       = UNKNOWN; 
+    incumbent       = MAX_COST;
     joinComparisons = 0;
     best_fw         = nullptr;
     best_bw         = nullptr;
@@ -1195,7 +1229,7 @@ void LMDefault::paretoArcJoin() {
 // Label sets are sorted by non-decreasing cost before the search (required invariant).
 // The overall best join found is stored in joinable_labels.
 void LMDefault::paretoNodeJoin() {
-    incumbent       = UNKNOWN;
+    incumbent       = MAX_COST;
     joinComparisons = 0;
     best_fw         = nullptr;
     best_bw         = nullptr;
@@ -1248,7 +1282,7 @@ bool LMDefault::isJoinFeasible(LabelAdv* label_forward, LabelAdv* label_backward
     }
 
     if(use_visited)
-        return (label_forward->getVisited() & label_backward->getVisited()).none();
+        return not intersects(label_forward->getVisited(), label_backward->getVisited());
 
     return true;
 }
@@ -1274,11 +1308,8 @@ bool LMDefault::isNodeJoinFeasible(LabelAdv* label_forward, LabelAdv* label_back
             return false;
     }
 
-    if(use_visited) {
-        auto mask = label_forward->getVisited() & label_backward->getVisited();
-        mask.reset(node);
-        return mask.none();
-    }
+    if(use_visited)
+        return not intersects_except(label_forward->getVisited(), label_backward->getVisited(), node);
     return true;
 }
 
@@ -1286,11 +1317,30 @@ bool LMDefault::isNodeJoinFeasible(LabelAdv* label_forward, LabelAdv* label_back
 
 /** Solution management +*/
 //Return a solution
-std::tuple<int, LabelAdv*, LabelAdv*> LMDefault::getSolutionLabels() {
-    std::tuple<int, LabelAdv*, LabelAdv*> solution_data = {0, nullptr, nullptr};
+std::tuple<cost_t, LabelAdv*, LabelAdv*> LMDefault::getSolutionLabels() {
+    std::tuple<cost_t, LabelAdv*, LabelAdv*> solution_data = {0, nullptr, nullptr};
 
-    if(bidirectional and joinFound())
+    if(bidirectional and joinFound()) {
         solution_data = getBestJoin();
+        cost_t best_objective = std::get<0>(solution_data);
+        int best_rank = MAX_INT;
+
+        //Among joins with the best objective, prefers elementary paths, then NG-routes
+        for (auto & join : joinable_labels) {
+            if (std::get<0>(join) != best_objective)
+                break;
+
+            int rank = getJoinRank(std::get<1>(join), std::get<2>(join));
+            if (rank < best_rank) {
+                best_rank = rank;
+                solution_data = join;
+
+                //An elementary path cannot be improved
+                if (best_rank == 0)
+                    break;
+            }
+        }
+    }
     else {
         LabelAdv* candidate = getODLabel();
         if(candidate){
@@ -1302,17 +1352,61 @@ std::tuple<int, LabelAdv*, LabelAdv*> LMDefault::getSolutionLabels() {
     return solution_data;
 }
 
+int LMDefault::getJoinRank(LabelAdv* label_forward, LabelAdv* label_backward){
+    //Builds the tour of the joined path
+    std::list<int> tour;
+    bool node_join = label_forward->getNode() == label_backward->getNode();
+
+    Label* label = label_forward;
+    while(label != nullptr){
+        tour.push_front(label->getNode());
+        label = label->getPredecessor();
+    }
+
+    label = node_join ? label_backward->getPredecessor() : label_backward;
+    while(label != nullptr){
+        tour.push_back(label->getNode());
+        label = label->getPredecessor();
+    }
+
+    //Checks elementarity and NG-route compliance
+    std::vector<bool> visited(problem->getNumNodes(), false);
+    Bitset memory(problem->getNumNodes());
+    bool elementary = true;
+    bool ng_route = unreachable_ng and not unreachable_ng->empty();
+
+    for(int node: tour) {
+        if(visited[node])
+            elementary = false;
+        if(ng_route and memory.get(node))
+            ng_route = false;
+        if(not elementary and not ng_route)
+            return 2;
+
+        visited[node] = true;
+        if(ng_route) {
+            memory &= (*unreachable_ng)[node];
+            memory.set(node);
+        }
+    }
+
+    //Rank 0: elementary path, rank 1: NG-route, rank 2: any other path
+    if(elementary)
+        return 0;
+    return ng_route ? 1 : 2;
+}
+
 void LMDefault::sortClosedLabels(bool direction, int node) {
     auto& closed = direction ? forward_closed[node] : backward_closed[node];
     std::sort(closed.begin(), closed.end());
 }
 
-const std::vector<std::pair<int, int>>& LMDefault::getClosedLabels(bool direction, int node) {
+const std::vector<std::pair<cost_t, int>>& LMDefault::getClosedLabels(bool direction, int node) {
     return direction ? forward_closed[node] : backward_closed[node];
 }
 
 void LMDefault::setODLabel() {
-    int bound = UNKNOWN;
+    cost_t bound = MAX_COST;
     int index = - 1;
     bool direction = true;
 
@@ -1372,7 +1466,7 @@ void LMDefault::findLabels(std::list<LabelAdv> *tourLabels) {
     bool direction;
     bool found;
     LabelAdv* l_stored;
-    std::vector<std::vector<std::pair<int, int>>> * stored_data;
+    std::vector<std::vector<std::pair<cost_t, int>>> * stored_data;
 
     for(auto & l_current: *tourLabels) {
         position = l_current.getNode();
@@ -1507,10 +1601,10 @@ void LMDefault::initLabelDataCollection(DataCollector* collector_label) {
     collector_label->init("direction", 0);
     collector_label->init("node", -1);
     collector_label->init("predecessor", -1);
-    collector_label->init("objective", UNKNOWN);
-    collector_label->init("consumption_critical", UNKNOWN);
+    collector_label->init("objective", MAX_COST);
+    collector_label->init("consumption_critical", MAX_INT);
     for(int i = 1; i < problem->getNumRes(); i++)
-        collector_label->init("consumption_"+std::to_string(i), UNKNOWN);
+        collector_label->init("consumption_"+std::to_string(i), MAX_INT);
     collector_label->init("tour_length", -1);
     collector_label->init("nvisited", -1);
     collector_label->init("nunreachable", -1);

@@ -154,6 +154,8 @@ void Parameters::readParameters(std::string param_path) {
             else if (val == "ordered_node") default_join_type = JOIN_ORDERED_NODE;
             else if (val == "kordered") default_join_type = JOIN_KORDERED;
             else if (val == "kordered_node") default_join_type = JOIN_KORDERED_NODE;
+            else if (val == "bucket_node") default_join_type = JOIN_BUCKET_NODE;
+            else if (val == "kbucket_node") default_join_type = JOIN_KBUCKET_NODE;
             else default_join_type = JOIN_CLASSIC;
         }},
         {"algo/requested_solutions", [&](const std::string& val) { requested_solutions = std::stoi(val);}},

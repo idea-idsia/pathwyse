@@ -51,15 +51,15 @@ public:
     double getNodeCost(int i)          {return problem->objExists() ? problem->getObj()->getNodeCostDouble(i) : 0.0;}
     std::vector<double> getNodeCosts() {return problem->objExists() ? problem->getObj()->getData()->getNodeCostsDouble() : std::vector<double>{};}
     double getArcCost(int i, int j)    {return problem->objExists() ? problem->getObj()->getArcCostDouble(i, j) : 0.0;}
-    double getObjLB()                  {return problem->objExists() ? problem->getObj()->getLBDouble() : INFMINUSDOUBLE;}
-    double getObjUB()                  {return problem->objExists() ? problem->getObj()->getUBDouble() : INFPLUSDOUBLE;}
+    double getObjLB()                  {return problem->objExists() ? problem->getObj()->getLBDouble() : MIN_DOUBLE;}
+    double getObjUB()                  {return problem->objExists() ? problem->getObj()->getUBDouble() : MAX_DOUBLE;}
     double getInitCost()               {return init_cost;}
 
     // Resource getters
-    int getResLB(int res_id)                          {return problem->resExists(res_id) ? problem->getRes(res_id)->getLB() : INFMINUS;}
-    int getResUB(int res_id)                          {return problem->resExists(res_id) ? problem->getRes(res_id)->getUB() : INFPLUS;}
-    int getResNodeLB(int res_id, int node)            {return problem->resExists(res_id) ? problem->getRes(res_id)->getNodeLB(node) : INFMINUS;}
-    int getResNodeUB(int res_id, int node)            {return problem->resExists(res_id) ? problem->getRes(res_id)->getNodeUB(node) : INFPLUS;}
+    int getResLB(int res_id)                          {return problem->resExists(res_id) ? problem->getRes(res_id)->getLB() : MIN_INT;}
+    int getResUB(int res_id)                          {return problem->resExists(res_id) ? problem->getRes(res_id)->getUB() : MAX_INT;}
+    int getResNodeLB(int res_id, int node)            {return problem->resExists(res_id) ? problem->getRes(res_id)->getNodeLB(node) : MIN_INT;}
+    int getResNodeUB(int res_id, int node)            {return problem->resExists(res_id) ? problem->getRes(res_id)->getNodeUB(node) : MAX_INT;}
     int getResArcConsumption(int res_id, int i, int j){return problem->resExists(res_id) ? problem->getRes(res_id)->getArcCost(i, j) : 0;}
     int getResNodeConsumption(int res_id, int i)      {return problem->resExists(res_id) ? problem->getRes(res_id)->getNodeCost(i) : 0;}
 

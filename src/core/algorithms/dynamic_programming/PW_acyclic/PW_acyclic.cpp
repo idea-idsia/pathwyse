@@ -65,6 +65,10 @@ void PWAcyclic::solve() {
         std::cout<<"Terminating: PWAcyclic is not suitable for instances with more than one resource. Please, choose another algorithm."<<std::endl;
         return;
     }
+    if(problem->hasNegativeCost()) {
+        std::cout<<"Terminating: PWAcyclic is not suitable for instances with negative costs. Please, choose another algorithm."<<std::endl;
+        return;
+    }
     collector.startGlobalTime();
 
     initAlgorithm();

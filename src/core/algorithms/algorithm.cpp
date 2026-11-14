@@ -20,8 +20,8 @@ Algorithm::Algorithm(std::string name, Problem* problem){
 void Algorithm::initAlgorithm(){
     iterations = 0;
     setStatus(ALGO_READY);
-    incumbent = INFPLUS;
-    lower_bound = INFMINUS;
+    incumbent = MAX_COST;
+    lower_bound = MIN_COST;
     timeout = false;
 }
 
@@ -33,7 +33,7 @@ void Algorithm::addSolution(Path & path) {
         best_solution_id = solutions.size() - 1;
 }
 
-bool Algorithm::updateIncumbent(int value) {
+bool Algorithm::updateIncumbent(cost_t value) {
     if(incumbent > value) {
         incumbent = value;
         return true;
@@ -41,7 +41,7 @@ bool Algorithm::updateIncumbent(int value) {
     return false;
 }
 
-bool Algorithm::updateLowerBound(int value) {
+bool Algorithm::updateLowerBound(cost_t value) {
     if(lower_bound < value) {
         lower_bound = value;
         return true;
@@ -50,7 +50,7 @@ bool Algorithm::updateLowerBound(int value) {
 }
 
 //Builds a path. NB: Algorithm cannot compute resource consumptions.
-void Algorithm::buildPath(int objective, Label* forward_label, Label* backward_label){
+void Algorithm::buildPath(cost_t objective, Label* forward_label, Label* backward_label){
 
     if(forward_label == nullptr and backward_label == nullptr)
         return;
@@ -83,8 +83,8 @@ void Algorithm::buildPath(int objective, Label* forward_label, Label* backward_l
     s.setTour(tour);
 
     //Updates total cost of arcs and nodes
-    int arcCost = 0;
-    int nodeCost = 0;
+    cost_t arcCost = 0;
+    cost_t nodeCost = 0;
 
     auto obj = problem->getObj();
 
@@ -187,7 +187,7 @@ void Algorithm::initDataCollection() {
     collector_sol.init("iterations", iterations);
     collector_sol.init("elementary", 0);
     collector_sol.init("solution_status", PATH_UNKNOWN);
-    collector_sol.init("objective", UNKNOWN);
+    collector_sol.init("objective", MAX_COST);
     collector_sol.init("tour_length", -1);
     collector_sol.init("tour", "");
     for(int i = 0; i < problem->getNumRes(); i++)
@@ -206,7 +206,7 @@ void Algorithm::collectSolution(int id){
 
     if(solutions.empty() or id >= solutions.size()) {
         collector_sol.collect("elementary", 0);
-        collector_sol.collect("objective", UNKNOWN);
+        collector_sol.collect("objective", MAX_COST);
         collector_sol.collect("tour_length", 0);
         collector_sol.collect("tour", "");
         for(int i = 0; i < problem->getNumRes(); i++)

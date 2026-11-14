@@ -114,6 +114,7 @@ We provide a toy instance under `instances/toy.txt` to verify the installation. 
 
 The file `pathwyse.set` contains the main configuration parameters. 
 A complete description of the available options is provided in: [Parameters](https://pathwyse.github.io/pathwyse/documentation/PARAMETERS_TABLE/)
+Recommended configurations for cyclic and acyclic networks are provided in: [Suggested Settings](https://pathwyse.github.io/pathwyse/documentation/SUGGESTED_SETTINGS/)
 
 Command-line keywords for overriding instance data at runtime are described in: [Extras](https://pathwyse.github.io/pathwyse/documentation/EXTRAS/).
 

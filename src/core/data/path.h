@@ -33,12 +33,12 @@ public:
     void setStatus(int status){solution_status = status;}
 
     //Objective and resource information
-    int getObjective(){return objective;}
-    void setObjective(int objective){this->objective = objective;}
-    int getArcCost() {return arc_cost;}
-    void setArcCost(int cost) {this->arc_cost = cost;}
-    int getNodeCost() {return node_cost;}
-    void setNodeCost(int cost) {this->node_cost = cost;}
+    cost_t getObjective(){return objective;}
+    void setObjective(cost_t objective){this->objective = objective;}
+    cost_t getArcCost() {return arc_cost;}
+    void setArcCost(cost_t cost) {this->arc_cost = cost;}
+    cost_t getNodeCost() {return node_cost;}
+    void setNodeCost(cost_t cost) {this->node_cost = cost;}
     int getConsumption(int id){return consumption[id];}
     std::vector<int> getConsumptions(){return consumption;}
     void setConsumption(std::vector<int> consumption){this->consumption = consumption;}
@@ -63,8 +63,8 @@ private:
     std::list<int> tour;                 //Tour elements
     bool elementary;
 
-    int objective;                      //Objective value
-    int arc_cost, node_cost;
+    cost_t objective;                   //Objective value
+    cost_t arc_cost, node_cost;
     std::vector<int> consumption;       //Resources consumption
 
     std::list<Label> labels;            //Path labels

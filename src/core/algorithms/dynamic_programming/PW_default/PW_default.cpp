@@ -8,6 +8,7 @@
 
 PWDefault::PWDefault(std::string name, Problem* problem): Algorithm(name, problem){
     label_manager = new LMDefault(problem);
+    label_manager->setUnreachables(&unreachable_active);
     readConfiguration();
     initDataCollection();
     setStatus(ALGO_READY);
@@ -54,7 +55,7 @@ void PWDefault::readConfiguration(){
     earlyjoin = Parameters::isDefaultJoinEarly();
     earlyjoin_step = Parameters::getDefaultJoinStep();
     use_visited = label_manager->getUseVisited();
-    two_cycle_elimination = Parameters::useTwoCycleElimination();
+    two_cycle_elimination = Parameters::useTwoCycleElimination() and label_manager->getCompareUnreachables();
     algo_type = ALGO_EXACT;
 
     if(not problem->isGraphCyclic()) {
@@ -91,6 +92,8 @@ void PWDefault::resetIteration(){
     it_ext_fw = it_ext_bw = 0;
     label_manager->setExecutionID(executionID);
     label_manager->setIteration(iterations);
+    label_manager->updateMaskedNeighbors();
+    label_manager->setUnreachablesNG(ng != NG_OFF ? &unreachable_ng : nullptr);
     label_manager->initLM();
 }
 
@@ -156,7 +159,7 @@ void PWDefault::solve(){
     bool termination = false;
 
 
-    if(not problem->isGraphCyclic() and Parameters::getPreprocessingIntensity() != PREPROCESSING_OFF){
+    if(not problem->isGraphCyclic() and not problem->hasNegativeCost() and Parameters::getPreprocessingIntensity() != PREPROCESSING_OFF){
         collector.startGlobalTime();
         termination = preprocessing();
         collector.stopGlobalTime();
@@ -257,9 +260,13 @@ void PWDefault::extend(LabelAdv* candidate) {
     bool direction = candidate->getDirection();
     bool active;
 
-    std::vector<int> neighbors = (candidate->getExtensionTarget() == ALL)
-        ? problem->getNeighbors(node, candidate->getDirection())
-        : std::vector<int>{candidate->getExtensionTarget()};
+    std::vector<int> single_target;
+    if (candidate->getExtensionTarget() != ALL)
+        single_target = {candidate->getExtensionTarget()};
+
+    const std::vector<int>& neighbors = (candidate->getExtensionTarget() == ALL)
+        ? problem->getNeighbors(node, direction)
+        : single_target;
 
     for(auto & neigh: neighbors) {
 
@@ -363,7 +370,7 @@ void PWDefault::managePaths(){
 
     auto solution_data = label_manager->getSolutionLabels();
 
-    int objective = std::get<0>(solution_data);
+    cost_t objective = std::get<0>(solution_data);
     auto *fw = std::get<1>(solution_data);
     auto *bw = std::get<2>(solution_data);
     buildPath(objective, fw, bw);
@@ -391,7 +398,7 @@ void PWDefault::managePaths(){
 void PWDefault::manageAdditionalPaths(){
     int additional_solutions_found = 0;
 
-    auto buildAdditionalPaths = [&](int cost, LabelAdv* fw, LabelAdv* bw) {
+    auto buildAdditionalPaths = [&](cost_t cost, LabelAdv* fw, LabelAdv* bw) {
         buildPath(cost, fw, bw);
         auto& path = solutions.back();
 
@@ -531,13 +538,13 @@ void PWDefault::buildNG(){
         if(ng_size <= 1) return;
 
         auto objective = problem->getObj();
-        std::set<std::pair<int, int>> ng_neighbors;
+        std::set<std::pair<cost_t, int>> ng_neighbors;
 
         int neighborhood_max_size = ng_size - 1; //To account for node i in the set
         for(int i = 0; i < n; i++) {
             for(int j = 0; j < n; j++)
                 if(problem->areNeighbors(i, j, true)) {
-                    int extension_cost = objective->extend(0,i,j,true);
+                    cost_t extension_cost = objective->extend(0,i,j,true);
                     if(ng_neighbors.size() < neighborhood_max_size)
                         ng_neighbors.insert(std::make_pair(extension_cost, j));
                     else if(extension_cost < ng_neighbors.rbegin()->first) {

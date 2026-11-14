@@ -36,6 +36,12 @@ int TimeWindow::extend(int current_value, int i, int j, bool direction) {
     return current_time;
 }
 
+//Minimum consumption of an extension
+int TimeWindow::getMinConsumption(int i, int j, bool direction) {
+    int service_node = direction ? i : j;
+    return data->getArcCost(i, j) + data->getNodeCost(service_node);
+}
+
 int TimeWindow::join(int current_value_forward, int current_value_backward, int i, int j){
     return current_value_forward + data->getNodeCost(i) + data->getArcCost(i, j) + data->getNodeCost(j) + current_value_backward;
 }

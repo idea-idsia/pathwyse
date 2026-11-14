@@ -13,7 +13,7 @@ public:
     LabelAdv() {};
     LabelAdv(const LabelAdv &obj);
 
-    ~LabelAdv() override = default;
+    ~LabelAdv() = default;
 
     //Init and updates
     void initVisited(int node, int n_nodes);
@@ -21,15 +21,16 @@ public:
 
     //Visited and unreachable management
     bool isReachable(int node) {return unreachable.get(node) == 0;}
-    void updateUnreachables(Bitset & mask) {unreachable &= mask; visited &= mask;}
+    void updateUnreachables(Bitset & mask) {unreachable &= mask; visited &= mask; refreshUnreachableCount();}
     Bitset & getVisited(){return visited;}
     bool getVisitedActive(int i){return visited.get(i);}
     Bitset & getUnreachable(){return unreachable;}
     bool getUnreachableActive(int i){return unreachable.get(i);}
 
 
-    void setUnreachable(int node){unreachable.set(node);}
-    int getUnreachableCount(){return unreachable.count();}
+    void setUnreachable(int node){if(not unreachable.get(node)) unreachable_count++; unreachable.set(node);}
+    int getUnreachableCount(){return unreachable_count;}
+    void refreshUnreachableCount(){unreachable_count = (uint16_t) unreachable.count();}
 
     //Dominated and Elementary status management
     bool isDominated(){return label_type == DOMINATED;}
@@ -52,6 +53,7 @@ public:
 
 protected:
     short label_type = UNDEFINED;
+    uint16_t unreachable_count = 0;
     int extension_target = ALL;
     Bitset visited;
     Bitset unreachable;

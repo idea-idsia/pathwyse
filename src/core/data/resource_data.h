@@ -6,35 +6,44 @@
 #include <cmath>
 #include "utils/constants.h"
 
-struct ResourceData {
+//T is the type of stored arc/node values: cost_t for the objective, int for resource consumptions.
+template<typename T>
+struct ResourceDataT {
 
     /** Resource data management **/
     //Constructors and Destructors
-    explicit ResourceData(int n_nodes) {this->n_nodes = n_nodes; coord_distance_type = DIST_NONE;}
-    virtual ~ResourceData() = default;
+    explicit ResourceDataT(int n_nodes) {this->n_nodes = n_nodes; coord_distance_type = DIST_NONE;}
+    virtual ~ResourceDataT() = default;
 
-    virtual void reset() {node_costs.clear(); node_costs_d.clear(); node_max_abs = 0.0; arc_max_abs = 0.0; node_max_dirty = false; arc_max_dirty = false;};
+    virtual void reset() {node_costs.clear(); node_costs_d.clear(); node_max_abs = 0.0; arc_max_abs = 0.0; node_max_dirty = false; arc_max_dirty = false; has_negative = false;};
 
     /** Node Data **/
-    void setNodeCosts(std::vector<int> node_costs){this->node_costs = node_costs;}
-    void setNodeCost(int id, int cost){
+    void setNodeCosts(std::vector<T> node_costs){
+        this->node_costs = node_costs;
+        for(T cost: this->node_costs)
+            if(cost < 0) { has_negative = true; break; }
+    }
+    void setNodeCost(int id, T cost){
         if(node_costs.empty())
             node_costs.resize(n_nodes, 0);
         node_costs[id] = cost;
+        if(cost < 0) has_negative = true;
     }
 
-    int getNodeCost(int id){return node_costs.empty() ? 0: node_costs[id];}
-    std::vector<int> & getNodeCosts() {return node_costs;}
+    T getNodeCost(int id){return node_costs.empty() ? 0: node_costs[id];}
+    std::vector<T> & getNodeCosts() {return node_costs;}
 
     /** Arc Data **/
-    virtual void setArcCost(int i, int j, int cost) = 0;
-    virtual int getArcCost(int i, int j) = 0;
+    virtual void setArcCost(int i, int j, T cost) = 0;
+    virtual T getArcCost(int i, int j) = 0;
+
+    bool hasNegativeValue(){return has_negative;}
 
     /** Distance Type **/
     int getCoordDistanceType(){return coord_distance_type;}
     void setCoordDistanceType(int type){coord_distance_type = type;}
 
-    /** Double representation (costs stored as double, converted to int before solve) **/
+    /** Double representation (costs stored as double, converted to T before solve) **/
     void setNodeCostDouble(int id, double cost) {
         if (node_costs_d.empty()) node_costs_d.resize(n_nodes, 0.0);
         node_costs_d[id] = cost;
@@ -54,7 +63,7 @@ struct ResourceData {
 
 protected:
     int n_nodes;
-    std::vector<int> node_costs;
+    std::vector<T> node_costs;
     int coord_distance_type;
     std::vector<double> node_costs_d;
 
@@ -62,6 +71,7 @@ protected:
     double arc_max_abs = 0.0;
     bool node_max_dirty = false;
     bool arc_max_dirty = false;
+    bool has_negative = false;
 
     void recomputeNodeMax() {
         node_max_abs = 0.0;
@@ -71,27 +81,36 @@ protected:
     virtual void recomputeArcMax() = 0;
 };
 
-struct ResourceDataMap: ResourceData {
+template<typename T>
+struct ResourceDataMapT: ResourceDataT<T> {
+
+    using ResourceDataT<T>::n_nodes;
+    using ResourceDataT<T>::node_costs_d;
+    using ResourceDataT<T>::arc_max_abs;
+    using ResourceDataT<T>::arc_max_dirty;
+    using ResourceDataT<T>::setNodeCost;
+    using ResourceDataT<T>::has_negative;
 
     /** Resource data management **/
     //Constructors and Destructors
-    explicit ResourceDataMap(int n_nodes): ResourceData(n_nodes) {
-        arc_costs.resize(n_nodes, std::map<int, int>());
+    explicit ResourceDataMapT(int n_nodes): ResourceDataT<T>(n_nodes) {
+        arc_costs.resize(n_nodes, std::map<int, T>());
     }
-    ~ResourceDataMap() = default;
+    ~ResourceDataMapT() = default;
 
-    void reset() override {ResourceData::reset(); arc_costs.clear(); arc_costs_d.clear();}
+    void reset() override {ResourceDataT<T>::reset(); arc_costs.clear(); arc_costs_d.clear();}
 
     /** Arc Data **/
-    void setArcCost(int i, int j, int cost) override {
+    void setArcCost(int i, int j, T cost) override {
         auto position = arc_costs[i].find(j);
         if(position == arc_costs[i].end())
             arc_costs[i].insert(std::make_pair(j, cost));
         else
             position->second = cost;
+        if(cost < 0) has_negative = true;
     }
 
-    int getArcCost(int i, int j) override {
+    T getArcCost(int i, int j) override {
         auto position = arc_costs[i].find(j);
         return position != arc_costs[i].end()? position->second : 0;
     }
@@ -113,9 +132,9 @@ struct ResourceDataMap: ResourceData {
     void applyScale(double scale) override {
         for (int i = 0; i < n_nodes; i++)
             for (auto& [j, c] : arc_costs_d[i])
-                setArcCost(i, j, (int)(c * scale));
+                setArcCost(i, j, (T)(c * scale));
         for (int i = 0; i < (int)node_costs_d.size(); i++)
-            setNodeCost(i, (int)(node_costs_d[i] * scale));
+            setNodeCost(i, (T)(node_costs_d[i] * scale));
     }
 
 protected:
@@ -127,25 +146,33 @@ protected:
     }
 
 private:
-    std::vector<std::map<int, int>> arc_costs;
+    std::vector<std::map<int, T>> arc_costs;
     std::vector<std::map<int, double>> arc_costs_d;
 
 };
 
-struct ResourceDataMatrix: ResourceData {
+template<typename T>
+struct ResourceDataMatrixT: ResourceDataT<T> {
+
+    using ResourceDataT<T>::n_nodes;
+    using ResourceDataT<T>::node_costs_d;
+    using ResourceDataT<T>::arc_max_abs;
+    using ResourceDataT<T>::arc_max_dirty;
+    using ResourceDataT<T>::setNodeCost;
+    using ResourceDataT<T>::has_negative;
 
     /** Resource data management **/
     //Constructors and Destructors
-    explicit ResourceDataMatrix(int n_nodes): ResourceData(n_nodes) {
-        arc_costs.resize(n_nodes, std::vector<int>(n_nodes, 0));
+    explicit ResourceDataMatrixT(int n_nodes): ResourceDataT<T>(n_nodes) {
+        arc_costs.resize(n_nodes, std::vector<T>(n_nodes, 0));
     }
-    ~ResourceDataMatrix() = default;
+    ~ResourceDataMatrixT() = default;
 
-    void reset() override {ResourceData::reset(); arc_costs.clear(); arc_costs_d.clear();}
+    void reset() override {ResourceDataT<T>::reset(); arc_costs.clear(); arc_costs_d.clear();}
 
     /** Arc Data **/
-    void setArcCost(int i, int j, int cost) override {arc_costs[i][j] = cost;}
-    int getArcCost(int i, int j) override {return arc_costs[i][j];}
+    void setArcCost(int i, int j, T cost) override {arc_costs[i][j] = cost; if(cost < 0) has_negative = true;}
+    T getArcCost(int i, int j) override {return arc_costs[i][j];}
 
     /** Double representation **/
     void setArcCostDouble(int i, int j, double cost) override {
@@ -162,9 +189,9 @@ struct ResourceDataMatrix: ResourceData {
         if (arc_costs_d.empty()) return;
         for (int i = 0; i < n_nodes; i++)
             for (int j = 0; j < n_nodes; j++)
-                arc_costs[i][j] = (int)(arc_costs_d[i][j] * scale);
+                arc_costs[i][j] = (T)(arc_costs_d[i][j] * scale);
         for (int i = 0; i < (int)node_costs_d.size(); i++)
-            setNodeCost(i, (int)(node_costs_d[i] * scale));
+            setNodeCost(i, (T)(node_costs_d[i] * scale));
     }
 
 protected:
@@ -176,8 +203,13 @@ protected:
     }
 
 private:
-    std::vector<std::vector<int>> arc_costs;
+    std::vector<std::vector<T>> arc_costs;
     std::vector<std::vector<double>> arc_costs_d;
 };
+
+using ResourceData = ResourceDataT<int>;
+using ResourceDataMap = ResourceDataMapT<int>;
+using ResourceDataMatrix = ResourceDataMatrixT<int>;
+using CostResourceData = ResourceDataT<cost_t>;
 
 #endif

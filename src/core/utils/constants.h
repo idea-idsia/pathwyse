@@ -1,4 +1,18 @@
 #include <limits>
+#include <cstdint>
+
+/** Objective cost type **/
+//For smaller costs, change to int32_t (and MAX_COST_DIGITS below to 9), then rebuild everything again.
+using cost_t = int64_t;
+#define MAX_COST_DIGITS 12
+
+#if defined(_MSC_VER)
+#define FORCE_INLINE __forceinline
+#define NO_INLINE __declspec(noinline)
+#else
+#define FORCE_INLINE [[gnu::always_inline]] inline
+#define NO_INLINE [[gnu::noinline]]
+#endif
 
 /** Status **/
 
@@ -40,16 +54,14 @@
 #define RANK_OBJECTIVE ("Objective")
 
 //Solution values
-#define UNKNOWN std::numeric_limits<int>::max()
-#define INFPLUS std::numeric_limits<int>::max()
-#define INFMINUS std::numeric_limits<int>::min()
-#define INFPLUSDOUBLE std::numeric_limits<double>::infinity()
-#define INFMINUSDOUBLE (-std::numeric_limits<double>::infinity())
+#define MAX_INT std::numeric_limits<int>::max()
+#define MAX_DOUBLE std::numeric_limits<double>::infinity()
+#define MAX_COST std::numeric_limits<cost_t>::max()
+#define MIN_INT std::numeric_limits<int>::min()
+#define MIN_DOUBLE (-std::numeric_limits<double>::infinity())
+#define MIN_COST std::numeric_limits<cost_t>::min()
 
 /** Problem **/
-
-//Maximum total significant digits for integer cost representation
-#define MAX_COST_DIGITS 9
 
 //Resource type creation
 #define RES_CAPACITY 0
@@ -107,7 +119,6 @@
 #define NG_STANDARD 1
 #define NG_RESTRICTED 2
 
-
 //Extension: Node Targets
 #define ALL (-1)
 
@@ -140,6 +151,8 @@
 #define JOIN_PARETO_NODE 7
 #define JOIN_KORDERED 8
 #define JOIN_KORDERED_NODE 9
+#define JOIN_BUCKET_NODE 10
+#define JOIN_KBUCKET_NODE 11
 
 //Insertion
 #define INSERT_OBJ 0

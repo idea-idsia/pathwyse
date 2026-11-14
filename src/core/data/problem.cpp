@@ -102,7 +102,7 @@ void Problem::printStatus(){
 
 /** Objective and Resource management **/
 //Initialize Objective data structures
-void Problem::initObjective(Resource *objective) {
+void Problem::initObjective(CostResource *objective) {
     //If a custom objective is not defined, use default objective
     if(not objective)
         objective = new DefaultCost();
@@ -147,14 +147,24 @@ int Problem::getCoordDistanceType(std::string distance) {
 
 int Problem::getMinConsumptionAtExtension(int res_id)
 {
-    int min_consumption = INFPLUS;
+    int min_consumption = MAX_INT;
     for(int i = 0; i < n_nodes; i++) {
         for(auto j: network.getNeighbors(i, true)) {
-            if (j == origin or j == destination)
-                continue;
-            int consumption = resources[res_id]->extend(0,i,j,true);
-            if (consumption < min_consumption)
-                min_consumption = consumption;
+            int consumption;
+
+            //Forward extension from i to j
+            if (j != origin and j != destination) {
+                consumption = resources[res_id]->getMinConsumption(i, j, true);
+                if (consumption < min_consumption)
+                    min_consumption = consumption;
+            }
+
+            //Backward extension from j to i
+            if (i != origin and i != destination) {
+                consumption = resources[res_id]->getMinConsumption(i, j, false);
+                if (consumption < min_consumption)
+                    min_consumption = consumption;
+            }
         }
     }
     return min_consumption;
@@ -332,12 +342,10 @@ void Problem::scaleCosts() {
         Logger::warn("problem/decimal_digits must be non-negative. Using 0.");
 
     int integer_digits = 1;
-    if (max_abs >= 1.0) {
-        int temp = (int) max_abs;
-        while (temp >= 10) {
-            temp /= 10;
-            integer_digits++;
-        }
+    double temp = max_abs;
+    while (temp >= 10) {
+        temp /= 10;
+        integer_digits++;
     }
     int available = std::max(0, MAX_COST_DIGITS - integer_digits);
 
@@ -453,7 +461,7 @@ int Problem::setResNodeBound(int res_id, int node, int lb, int ub) {
     if (duplicate_depot and node == origin){
         if (lb == 0 and ub == 0){
             Logger::warn("Destination TW upper bound is 0. Changing it to MAX_INT.");
-            ub = UNKNOWN;
+            ub = MAX_INT;
         }
         resources[res_id]->setNodeBound(n_nodes, destination, lb, ub);
     }

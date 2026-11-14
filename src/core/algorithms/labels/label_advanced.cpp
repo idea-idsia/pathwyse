@@ -4,6 +4,7 @@
 //Constructors and destructors
 LabelAdv::LabelAdv(const LabelAdv &obj) : Label(obj) {
     label_type = obj.label_type;
+    unreachable_count = obj.unreachable_count;
     extension_target = obj.extension_target;
     visited = obj.visited;
     unreachable = obj.unreachable;
@@ -14,6 +15,7 @@ void LabelAdv::initVisited(int node, int n_nodes){
     visited = Bitset(n_nodes);
     visited.set(node);
     unreachable = visited;
+    unreachable_count = 1;
 }
 
 void LabelAdv::updateLabel(int node, LabelAdv* predecessor) {
@@ -22,7 +24,7 @@ void LabelAdv::updateLabel(int node, LabelAdv* predecessor) {
     label_type = UNDEFINED;
     if(not visited.empty()) {
         visited.set(node);
-        unreachable.set(node);
+        setUnreachable(node);
     }
 }
 
@@ -32,6 +34,7 @@ void LabelAdv::operator= (const LabelAdv& obj)  {
 
     extension_target = obj.extension_target;
     label_type = obj.label_type;
+    unreachable_count = obj.unreachable_count;
     visited = obj.visited;
     unreachable = obj.unreachable;
 }

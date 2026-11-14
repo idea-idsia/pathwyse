@@ -18,7 +18,7 @@ public:
     //Solution process
     void solve() override;
     void extendLabel(Label* current_label, Label & new_label, int next_node);
-    bool isLabelValid(Label* l, int cost);
+    bool isLabelValid(Label* l, cost_t cost);
     bool isCriticalLabelValid(Label* l);
     void checkFeasibility();
     void checkOptimality();
@@ -32,9 +32,9 @@ public:
     /** Query **/
     Bitset & getVisited(){return visited;}
     //Returns the minimum distance for a node (from the source)
-    int getDistance(int node){return distances[node];}
+    cost_t getDistance(int node){return distances[node];}
     //Returns the distance of a label (from the source)
-    int getDistance(Label * l){return res_id == RES_COST ? l->getObjective() : l->getSnapshot(res_id);}
+    cost_t getDistance(Label * l){return res_id == RES_COST ? l->getObjective() : l->getSnapshot(res_id);}
 
     /** Solution management **/
     void managePaths();
@@ -54,7 +54,7 @@ private:
     int coord_distance_algo;
 
     //Resource and completion labels pointers
-    Resource* obj;
+    CostResource* obj;
     Resource* critical_res;
     std::vector<Resource*> resources;
     BoundLabels* bound_labels;
@@ -63,10 +63,10 @@ private:
     std::vector<Label>* labels;
 
     Bitset visited;
-    std::vector<int> distances;
-    std::priority_queue<std::pair<int, int>, std::vector<std::pair<int, int>>, std::greater<>> pq;
+    std::vector<cost_t> distances;
+    std::priority_queue<std::pair<cost_t, int>, std::vector<std::pair<cost_t, int>>, std::greater<>> pq;
 
-    std::tuple<int, Label*, Label*> solution_data;
+    std::tuple<cost_t, Label*, Label*> solution_data;
 };
 
 #endif

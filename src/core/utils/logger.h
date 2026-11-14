@@ -4,7 +4,11 @@
 #include <iostream>
 #include <string>
 #include <algorithm>
+#ifdef _WIN32
+#include <io.h>
+#else
 #include <unistd.h>
+#endif
 #include "param.h"
 
 namespace Logger {
@@ -15,7 +19,11 @@ namespace Logger {
     inline bool enabled(int verbosity) {return Parameters::getVerbosity() >= verbosity;}
 
     inline const char* c(const char* code) {
+#ifdef _WIN32
+        static bool tty = _isatty(_fileno(stdout));
+#else
         static bool tty = isatty(fileno(stdout));
+#endif
         return tty ? code : "";
     }
 

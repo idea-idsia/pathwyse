@@ -19,9 +19,9 @@ void Path::initPath() {
     tour.clear();
 
     elementary = false;
-    objective = UNKNOWN;
-    arc_cost = UNKNOWN;
-    node_cost = UNKNOWN;
+    objective = MAX_COST;
+    arc_cost = MAX_COST;
+    node_cost = MAX_COST;
     consumption.clear();
     labels.clear();
 }

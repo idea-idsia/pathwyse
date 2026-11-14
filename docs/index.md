@@ -114,6 +114,7 @@ We provide a toy instance under `instances/toy.txt` to verify the installation. 
 
 The file `pathwyse.set` contains the main configuration parameters. 
 A complete description of the available options is provided in: [Parameters](documentation/PARAMETERS_TABLE.md)
+Recommended configurations for cyclic and acyclic networks are provided in: [Suggested Settings](documentation/SUGGESTED_SETTINGS.md)
 
 Command-line keywords for overriding instance data at runtime are described in: [Extras](documentation/EXTRAS.md)
 

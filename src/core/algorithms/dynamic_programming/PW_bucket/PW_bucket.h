@@ -64,6 +64,7 @@ protected:
     int dssr;                   //DSSR mode
     int ng;                     //NG mode
     int ng_size;
+    std::string ng_set_path;
     bool earlyjoin;
     unsigned long long int earlyjoin_step;
 
