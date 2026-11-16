@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 20)
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	set(CMAKE_CXX_FLAGS  "/O2 /w  /DNDEBUG")
 else()
-	set(CMAKE_CXX_FLAGS  "-O3 -w -pthread -fopenmp -DNDEBUG -fno-semantic-interposition")
+	set(CMAKE_CXX_FLAGS  "-O3 -w -pthread -DNDEBUG -fno-semantic-interposition")
 endif()
 
 #Project information
