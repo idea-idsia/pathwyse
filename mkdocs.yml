@@ -1,7 +1,7 @@
 site_name: PathWyse
 site_description: A C++ and Python framework to model and solve Resource Constrained Shortest Path Problems.
-site_url: https://pathwyse.github.io/pathwyse/
-repo_url: https://github.com/pathwyse/pathwyse
+site_url: https://idea.idsia.ch/pathwyse/
+repo_url: https://github.com/idea-idsia/pathwyse
 repo_name: pathwyse
 
 theme:

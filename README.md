@@ -96,7 +96,7 @@ PathWyse also supports simple heuristics, bucket-based label organization (PWBuc
 
 ## Getting started
 
-To compile the project, follow the instructions in: [Installation](https://pathwyse.github.io/pathwyse/documentation/INSTALL/)
+To compile the project, follow the instructions in: [Installation](https://idea.idsia.ch/pathwyse/documentation/INSTALL/)
 
 After compilation, instances can be solved from the command line:
 
@@ -104,7 +104,7 @@ After compilation, instances can be solved from the command line:
 ./bin/pathwyse path-to-instance
 ```
 
-The instance format is described in: [Instance Format](https://pathwyse.github.io/pathwyse/documentation/INSTANCE/)
+The instance format is described in: [Instance Format](https://idea.idsia.ch/pathwyse/documentation/INSTANCE/)
 
 We provide a toy instance under `instances/toy.txt` to verify the installation. Additional benchmark instances from the literature are available under `instances/`:
 
@@ -113,18 +113,18 @@ We provide a toy instance under `instances/toy.txt` to verify the installation. 
 - `instances/longestpath/` — LongestPath [Salani et al., 2024]
 
 The file `pathwyse.set` contains the main configuration parameters. 
-A complete description of the available options is provided in: [Parameters](https://pathwyse.github.io/pathwyse/documentation/PARAMETERS_TABLE/)
-Recommended configurations for cyclic and acyclic networks are provided in: [Suggested Settings](https://pathwyse.github.io/pathwyse/documentation/SUGGESTED_SETTINGS/)
+A complete description of the available options is provided in: [Parameters](https://idea.idsia.ch/pathwyse/documentation/PARAMETERS_TABLE/)
+Recommended configurations for cyclic and acyclic networks are provided in: [Suggested Settings](https://idea.idsia.ch/pathwyse/documentation/SUGGESTED_SETTINGS/)
 
-Command-line keywords for overriding instance data at runtime are described in: [Extras](https://pathwyse.github.io/pathwyse/documentation/EXTRAS/).
+Command-line keywords for overriding instance data at runtime are described in: [Extras](https://idea.idsia.ch/pathwyse/documentation/EXTRAS/).
 
-Instructions for using PathWyse from Python are available in: [Python](https://pathwyse.github.io/pathwyse/python/PYTHON/)
+Instructions for using PathWyse from Python are available in: [Python](https://idea.idsia.ch/pathwyse/python/PYTHON/)
 
 ---
 
 ## Documentation
 
-The full documentation, including installation guides, API references, and tutorials, is available at: https://pathwyse.github.io/pathwyse/
+The full documentation, including installation guides, API references, and tutorials, is available at: https://idea.idsia.ch/pathwyse/
 
 The Solver class provides the main interface for interacting with the library programmatically.
 
